@@ -71,7 +71,7 @@ binary search. The advantages are:
 A sorted _memtable_ can be used to keep the most recent writes in memory as a red-black or AVL tree, and when it is full, it is written to 
 disk as an SSTable. This is called **log-structured merge-tree (LSM-tree)**.
 
-### B-Trees
+## B-Trees
 
 B-Trees are a more general data structure than LSM-trees. They are used in databases like PostgreSQL and Oracle. They are optimized for
 systems that read and write data in blocks, and they are designed to work well even if the data is too large to fit in memory.
@@ -94,3 +94,16 @@ B-trees also have a mechanism to prevent the index to be corrupted if the databa
 **write-ahead log (WAL)**. It is a file that records all the changes that are being made to the database. When a write operation
 is performed, it is first written to the log, and only then it is written to the B-tree. If the database crashes, it can recover
 the B-tree by replaying the log from the last checkpoint.
+
+## B-Trees vs LSM-Trees
+
+### Advantages of LSM-Trees
+- In general more suited for write-heavy workloads since it is append-only.
+- Produce less write amplification (less data is written to disk).
+- Can be compressed more efficiently, producing smaller files on disk.
+
+### Advantages of B-Trees
+- In general have better read performance.
+- No need to periodically merge segments, which may interfere with ongoing writes and reads.
+- Less space overhead (no need to keep a sparse index).
+- Strong transactional guarantees since data exists in only one place, so it's easy to use locks.
