@@ -70,3 +70,27 @@ binary search. The advantages are:
 
 A sorted _memtable_ can be used to keep the most recent writes in memory as a red-black or AVL tree, and when it is full, it is written to 
 disk as an SSTable. This is called **log-structured merge-tree (LSM-tree)**.
+
+### B-Trees
+
+B-Trees are a more general data structure than LSM-trees. They are used in databases like PostgreSQL and Oracle. They are optimized for
+systems that read and write data in blocks, and they are designed to work well even if the data is too large to fit in memory.
+
+The only similarity with LSM-trees is that they also keep key-value pairs sorted by key.
+
+Each page is a block of bytes (usually 4kB), which can be identified using an address, which allows one page to refer to another.
+One page is called the root page, when a request arrives, the root page is read and a binary search is performed to find the key.
+If it's not found, the page will contain a pointer to another page, which will be read and searched, and so on, until it finds
+a page that contains values for the searched key, which is called a **leaf page**.
+
+![](images/b-trees.jpg)
+
+When adding a new key-value pair, the algorithm needs to check if the leaf page is full. If it is, it will split the page in two
+and move half of the key-value pairs to a new page. The parent page will then be updated to add a pointer to the new page.
+
+The algorithm ensures that the tree is balanced, so the height of the tree is O(log n), where n is the number of key-value pairs.
+
+B-trees also have a mechanism to prevent the index to be corrupted if the database crashes during a write operation. It is called
+**write-ahead log (WAL)**. It is a file that records all the changes that are being made to the database. When a write operation
+is performed, it is first written to the log, and only then it is written to the B-tree. If the database crashes, it can recover
+the B-tree by replaying the log from the last checkpoint.
