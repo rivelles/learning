@@ -59,3 +59,14 @@ Imagine a file that appends key-values of views per cat videos. We have a segmen
 
 Each segment has its own hash table, so if we look for a key, we will first try to find it in the most recent segment's hash table. If we
 don't find it, we will look in the previous segment's hash table, and so on.
+
+### SSTables and LSM-Trees
+
+An SSTable has the same mechanism we described, but it is a file that is sorted by key. This makes it easier to search for a key using
+binary search. The advantages are:
+- To create a new segment from others, it uses an approach similar to the merge sort algorithm.
+- There is no need to keep all the hash tables in memory, since we can find the range using the existing keys and scan from a sparse index.
+- Each entry of the sparse index can point to a compressed block in the disk.
+
+A sorted _memtable_ can be used to keep the most recent writes in memory as a red-black or AVL tree, and when it is full, it is written to 
+disk as an SSTable. This is called **log-structured merge-tree (LSM-tree)**.
