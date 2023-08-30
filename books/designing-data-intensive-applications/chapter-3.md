@@ -107,3 +107,24 @@ the B-tree by replaying the log from the last checkpoint.
 - No need to periodically merge segments, which may interfere with ongoing writes and reads.
 - Less space overhead (no need to keep a sparse index).
 - Strong transactional guarantees since data exists in only one place, so it's easy to use locks.
+- 
+## Clustered index
+Usually, a key stored into an index will point to a row that is stored on a heap file. This stores data in no particular order.
+If we need to update this value, if the new value is bigger than the old one, we might need to store a pointer to another
+location on disk. The retrieval of this value becomes more expensive.
+
+To avoid this, it can be desirable to store the indexed row directly in the index. This is known as a clustered index and
+is used in several technologies. Ex: In MySQL's InnoDB, the primary key of a table is always a clustered index.
+
+It's possible also to include only some columns in the index, allowing some queries to be answered by using the index only
+and saving some space.
+
+## OLTP vs OLAP
+The difference between OLTP and OLAP databases is related to how they process data.
+- OLTP read pattern is suited for small number of records per query, while for OLAP it loads a large number of records.
+- Writes in OLTP have a random access pattern, while for OLAP it's suited for ETLs or event streams.
+- OLTP is usually used by end-users, while OLAP is used by internal analysts for decision taking.
+- OLTP data represents the latest state of it, while for OLAP it can represent history of events that happened.
+- The size of the dataset is usually much bigger in OLAP databases.
+
+This makes OLAP databases better suited for data warehousing.
