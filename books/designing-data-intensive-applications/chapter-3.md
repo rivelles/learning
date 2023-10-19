@@ -107,7 +107,7 @@ the B-tree by replaying the log from the last checkpoint.
 - No need to periodically merge segments, which may interfere with ongoing writes and reads.
 - Less space overhead (no need to keep a sparse index).
 - Strong transactional guarantees since data exists in only one place, so it's easy to use locks.
-- 
+
 ## Clustered index
 Usually, a key stored into an index will point to a row that is stored on a heap file. This stores data in no particular order.
 If we need to update this value, if the new value is bigger than the old one, we might need to store a pointer to another
@@ -127,4 +127,43 @@ The difference between OLTP and OLAP databases is related to how they process da
 - OLTP data represents the latest state of it, while for OLAP it can represent history of events that happened.
 - The size of the dataset is usually much bigger in OLAP databases.
 
-This makes OLAP databases better suited for data warehousing.
+This makes OLAP databases better suited for data warehousing, although they both can have SQL interfaces.
+
+Usually, OLAP databases have a facts table, which contains events that happened over time, and dimension tables, which
+contain information about the entities involved in the events. This is called a **star schema**. For example, imagine 
+a table that contains the number of views for a webpage, and a table that contains information about the webpages.
+The dimension table might contain information about the webpages, such as the URL, the title, the author, etc, and the
+facts table might contain the number of views for each webpage, using the page ID as a foreign key.
+
+## Column-oriented storage
+
+In OLTP databases, data is stored in a row-based format. However, in OLAP databases, it is more common to store data in
+a column-oriented format. This is because OLAP databases usually contains a large number of columns, and queries usually
+only need to access a few of them at a time. For example, in an order_facts table, we might need to view every occurence
+of orders for fruit or candy during the 2013 year, so it would only need to access three columns: product_id, date and quantity.
+
+In a row-oriented database, the database most likely would need to read the entire dataset and filter out rows that don't
+satisfy the query. The idea behind column-oriented storage is to store all values from each column together. Each column
+will have its own file, and when a query is performed, the database will only need to read the files that are needed.
+
+| product_sk | store_sk | promotion_sk | quantity | net_price | customer_sk |
+|------------|----------|--------------|----------|-----------|-------------|
+| 69         | 4        | NULL         | 1        | 12.5      | 10          |
+| 69         | 5        | NULL         | 2        | 25        | 20          |
+| 74         | 5        | 2            | 2        | 1.0       | 30          |
+| 31         | 8        | 2            | 1        | 5.0       | 40          |
+| 31         | 4        | NULL         | 4        | 20.0      | 10          |
+
+We would have the following files:
+product_sk: 69,69,74,31,31
+store_sk: 4,5,5,8,4
+promotion_sk: NULL,NULL,2,2,NULL
+quantity: 1,2,2,1,4
+net_price: 12.5,25,1.0,5.0,20.0
+customer_sk: 10,20,30,40,10
+
+So, if we wanted to query the quantity of products sold in store 4, we would only need to read the store_sk and quantity files.
+
+This type of storage can also use compression to be more efficient by using bitmap encoding.
+
+Usually, it's a good practice to choose a column that is used in most queries as the one to be used to sort the data.
