@@ -50,3 +50,35 @@ The first byte would indicate that what follows is an object with three entries 
 - The type and the length of the value (example: String with 6 characters - Martin: 0xa6)
 
 This encoding would be 66 bytes long, which is less than the 81 bytes of the JSON representation.
+
+### Thrift and Protocol Buffers
+
+These are binary encoding libraries based on the idea of a schema and code generation. You define the schema of your
+data in a language-independent format, and then you use a code generation tool to generate classes from that schema.
+
+Examples:
+
+**Thrift**
+```
+struct Person {
+    1: required string       userName,
+    2: optional i64          favoriteNumber,
+    3: optional list<string> interests
+}
+```
+
+The binary encoding for this schema would be similar to the MessagePack example. However, it doesn't need to include
+the field names. Instead, it uses field tags (1, 2, 3) to identify them. Thrift also have a Compact Protocol, which
+packs the tag number and the type into a single byte. It also uses variable-length integers to save space for small
+numbers.
+
+**Protocol Buffers**
+```
+message Person {
+    required string userName       = 1;
+    optional int64  favoriteNumber = 2;
+    repeated string interests      = 3;
+}
+```
+
+Protocol Buffers encode data similarly to Thrift's Compact Protocol, but it can save slightly a few more bytes.
