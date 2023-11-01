@@ -82,3 +82,10 @@ message Person {
 ```
 
 Protocol Buffers encode data similarly to Thrift's Compact Protocol, but it can save slightly a few more bytes.
+
+#### Schema evolution
+
+In order to guarantee compatibility, some rules need to be followed:
+- When adding a new field, if it's not optional, new code can't read old code's generated values (not backward-compatible)
+- When removing a field, if it's not optional, old code can't read new code's generated values (not forward-compatible)
+- When changing datatypes of a field, it can lose precision or get truncated (int32 to int64: it's OK for new code only)
