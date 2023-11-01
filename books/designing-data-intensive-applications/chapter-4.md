@@ -89,3 +89,38 @@ In order to guarantee compatibility, some rules need to be followed:
 - When adding a new field, if it's not optional, new code can't read old code's generated values (not backward-compatible)
 - When removing a field, if it's not optional, old code can't read new code's generated values (not forward-compatible)
 - When changing datatypes of a field, it can lose precision or get truncated (int32 to int64: it's OK for new code only)
+
+### Avro
+
+Avro is another binary encoding format. It uses Avro IDL language (more human-readable) and its JSON representation to be written.
+
+```
+record Person {
+    string              userName;
+    union {null, long}  favoriteNumber = null;
+    array<string>       interests;
+}
+```
+The equivalent in JSON would be:
+```json
+{
+  "type": "record",
+  "name": "Person",
+  "fields": [
+    {"name":  "userName",         "type":  "string"},
+    {"name":  "favoriteNumber",   "type":  ["null", "long"], "default":  null},
+    {"name":  "interests",        "type":  {"type":  "array", "items": "string"}}
+  ]
+}
+```
+
+The main differences between Avro and Protocol Buffers/Thrift are:
+- There are no tags to identify the fields
+- In the binary encoded value, there is nothing to identify the datatypes
+
+To parse the data, the code goes through the fields in the same order as they appear in the schema and use it to determine
+each field's type. The binary content will only contain the length and the values for each field in UTF-8 bytes.
+
+#### Schema evolution in Avro
+
+To achieve schema evolution, we need to have a schema both in the writer and in the reader, and they need to be compatible.
