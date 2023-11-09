@@ -142,3 +142,27 @@ Textual data formats like JSON and XML are widespread, binary formats have a few
 - A schema registry can be used to enforce backward and forward compatibility
 - There is the possibility of generating code from the schema, which can be more efficient than using reflection
 
+## Modes of Dataflow
+
+### Dataflow Through Databases
+
+Databases are the most common way to share data. Usually, applications write and read data and, for this, they need
+to serialize and deserialize it. This process needs to be backwards and forwards compatible, otherwise new versions
+of the code won't be able to read data written by old versions and vice-versa (imagine the application is being 
+deployed, and we still have the old version accessing data written by the new one).
+
+Another point to pay attention: The application needs to take care of the cases where the old version is updating data
+that was previously inserted by the new version. If there were new fields introduced, they can be lost.
+
+### Dataflow Through Services: REST and RPC
+
+These are two common ways to implement communication between services over a network.
+
+REST is not a protocol, but a design philosophy built on top of HTTP. RPC is a more general concept: it is a way of
+calling a function or method on a remote network service. It is a very old concept, but it has been rediscovered
+recently. In the end, there is no point on making RPC look like a local function call, because it's not. In all cases,
+you need to be aware that you are making a remote call and deal with the consequences.
+
+There are some RPC protocols with binary encoding. They are more compact and faster than JSON, which is used in REST.
+However, JSON provides the ability to debug and inspect the data in a human-readable format and is supported by
+almost all programming languages.
