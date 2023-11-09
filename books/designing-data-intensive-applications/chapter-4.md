@@ -124,3 +124,21 @@ each field's type. The binary content will only contain the length and the value
 #### Schema evolution in Avro
 
 To achieve schema evolution, we need to have a schema both in the writer and in the reader, and they need to be compatible.
+
+To mantain compatibility, we need to always add and remove fields that have a default value.
+Adding a field without a default value breaks backward compatibility. Removing a field breaks forward compatibility.
+
+#### The writer's schema
+
+How does the reader know which is the schema of the data it's reading? The writer's schema is included in the data itself.
+When the writer writes a record, it includes the schema ID in the header. The reader can then look up the schema in a
+schema registry.
+
+### The Merits of Schemas
+
+Textual data formats like JSON and XML are widespread, binary formats have a few advantages:
+- They are much more compact, so they require less disk space and less bandwidth.
+- Schema is a valuable form of documentation
+- A schema registry can be used to enforce backward and forward compatibility
+- There is the possibility of generating code from the schema, which can be more efficient than using reflection
+
