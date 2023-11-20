@@ -34,3 +34,4 @@ build/
 scripts/env/
 
 segments/
+wal/

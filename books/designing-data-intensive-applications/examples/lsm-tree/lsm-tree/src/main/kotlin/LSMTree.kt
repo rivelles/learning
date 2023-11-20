@@ -1,5 +1,6 @@
 import serialization.AvroSerializer
 import java.io.File
+import java.io.OutputStreamWriter
 
 /**
  * A simple implementation of a Log-Structured Merge Tree. It's only supposed to be used as a learning tool, as it doesn't
@@ -8,10 +9,12 @@ import java.io.File
  */
 class LSMTree(capacity: Int = 100) {
     private val memTable = MemTable(capacity)
+    private val wal = WriteAheadLog()
 
     init {
         val dir = File("segments")
         if (!dir.exists()) dir.mkdir()
+        wal.initialize()
     }
 
     private fun runLoggingTime(operation: String, function: () -> Any?): Any? {
@@ -49,6 +52,7 @@ class LSMTree(capacity: Int = 100) {
                 memTable.clear()
                 println("Segment created successfully!")
             }
+            wal.write(key, value)
         }
     }
 
@@ -106,6 +110,31 @@ class LSMTree(capacity: Int = 100) {
 
         fun get(key: String): String? {
             return content?.get(key)
+        }
+    }
+
+    class WriteAheadLog {
+        private var currentLog = 0
+        private val file = File("wal/wal.log")
+
+        fun initialize() {
+            val dir = File("wal")
+
+            if (!dir.exists()) {
+                dir.mkdir()
+            }
+            if (!file.exists()) {
+                file.createNewFile()
+            }
+            currentLog = file.readLines().size
+        }
+
+        fun write(key: String, value: String) {
+            val writer = file.outputStream().writer()
+            writer.appendLine("$key:$value")
+            writer.close()
+
+            currentLog++
         }
     }
 }
