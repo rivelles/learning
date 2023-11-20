@@ -9,7 +9,7 @@ class LSMTree(capacity: Int = 100) {
         if (!dir.exists()) dir.mkdir()
     }
 
-    fun get(key: String): String? {
+    fun get(key: Long): Any? {
         return memTable.get(key) ?: run {
             var segmentIteratorIndex = getLastSegment()
             while (segmentIteratorIndex > 0) {
@@ -23,7 +23,7 @@ class LSMTree(capacity: Int = 100) {
         }
     }
 
-    fun put(key: String, value: String) {
+    fun put(key: Long, value: String) {
         memTable.put(key, value)
         if (memTable.isFull()) {
             println("Memtable is full, creating new segment...")
@@ -45,13 +45,13 @@ class LSMTree(capacity: Int = 100) {
     }
 
     class MemTable(private val capacity: Int = 100) {
-        private val map = mutableMapOf<String, String>()
+        private val map = mutableMapOf<Long, Any>()
 
-        fun get(key: String): String? {
+        fun get(key: Long): Any? {
             return map[key]
         }
 
-        fun put(key: String, value: String) {
+        fun put(key: Long, value: Any) {
             map[key] = value
         }
 
@@ -63,18 +63,16 @@ class LSMTree(capacity: Int = 100) {
             map.clear()
         }
 
-        fun createSegment(nextSegment: Long) {
-            Segment(nextSegment.toString(), map)
-        }
+        fun createSegment(nextSegment: Long) = Segment(nextSegment.toString(), map)
     }
 
     class Segment {
 
-        private var content: Map<String, String>? = null
+        private var content: Map<Long, Any>? = null
         private val fileDir: String
         private val gson = Gson()
 
-        constructor(fileDir: String, content: Map<String, String>?) {
+        constructor(fileDir: String, content: Map<Long, Any>?) {
             this.fileDir = fileDir
             this.content = content
 
@@ -88,11 +86,11 @@ class LSMTree(capacity: Int = 100) {
 
             val file = File("segments/$fileDir")
             file.takeIf { it.exists() }?.let {
-                content = gson.fromJson(it.readText(), Map::class.java) as Map<String, String>?
+                content = gson.fromJson(it.readText(), Map::class.java) as Map<Long, Any>?
             }
         }
 
-        fun get(key: String): String? {
+        fun get(key: Long): Any? {
             return content?.get(key)
         }
     }

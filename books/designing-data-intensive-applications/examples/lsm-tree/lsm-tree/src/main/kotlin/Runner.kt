@@ -8,9 +8,11 @@ fun main() {
     while (!isExited) {
         val nextCommand = readLine()!!.split(" ")
 
+        val key = nextCommand[1].toLong()
+
         when (nextCommand[0]) {
-            "put" -> lsmTree.put(nextCommand[1], nextCommand[2])
-            "get" -> println(lsmTree.get(nextCommand[1]))
+            "put" -> lsmTree.put(key, nextCommand[2])
+            "get" -> println(lsmTree.get(key))
             "exit" -> isExited = true
         }
     }
