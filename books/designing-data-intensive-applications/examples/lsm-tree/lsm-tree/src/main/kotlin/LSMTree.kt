@@ -35,6 +35,7 @@ class LSMTree(capacity: Int = 100) {
             val nextSegment = getLastSegment() + 1
             memTable.createSegment(nextSegment)
             memTable.clear()
+            println("Segment created successfully!")
         }
     }
 

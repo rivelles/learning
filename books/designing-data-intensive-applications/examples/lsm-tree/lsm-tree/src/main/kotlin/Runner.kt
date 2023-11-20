@@ -3,6 +3,7 @@ fun main() {
     val capacity = readLine()!!.toInt()
     println("Database is starting...")
     val lsmTree = LSMTree(capacity)
+    println("Database running!")
 
     var isExited = false
     while (!isExited) {
