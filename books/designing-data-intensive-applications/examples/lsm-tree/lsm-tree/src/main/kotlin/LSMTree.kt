@@ -14,28 +14,41 @@ class LSMTree(capacity: Int = 100) {
         if (!dir.exists()) dir.mkdir()
     }
 
-    fun get(key: String): Any? {
-        return memTable.get(key) ?: run {
-            var segmentIteratorIndex = getLastSegment()
-            while (segmentIteratorIndex > 0) {
-                val segment = Segment(segmentIteratorIndex.toString())
+    private fun runLoggingTime(operation: String, function: () -> Any?): Any? {
+        val startTime = System.currentTimeMillis()
+        val returnedValue = function()
+        val endTime = System.currentTimeMillis()
+        println("$operation executed. Time elapsed: ${endTime - startTime} ms")
 
-                segment.let {
-                    segment.get(key)?.let { return it }
-                } ?: segmentIteratorIndex--
+        return returnedValue
+    }
+
+    fun get(key: String): Any? {
+        return runLoggingTime("Get") {
+            memTable.get(key) ?: run {
+                var segmentIteratorIndex = getLastSegment()
+                while (segmentIteratorIndex > 0) {
+                    val segment = Segment(segmentIteratorIndex.toString())
+
+                    segment.let {
+                        segment.get(key)?.let { return@runLoggingTime it }
+                    } ?: segmentIteratorIndex--
+                }
+                return@runLoggingTime null
             }
-            return null
         }
     }
 
     fun put(key: String, value: String) {
-        memTable.put(key, value)
-        if (memTable.isFull()) {
-            println("Memtable is full, creating new segment...")
-            val nextSegment = getLastSegment() + 1
-            memTable.createSegment(nextSegment)
-            memTable.clear()
-            println("Segment created successfully!")
+        runLoggingTime("Put") {
+            memTable.put(key, value)
+            if (memTable.isFull()) {
+                println("Memtable is full, creating new segment...")
+                val nextSegment = getLastSegment() + 1
+                memTable.createSegment(nextSegment)
+                memTable.clear()
+                println("Segment created successfully!")
+            }
         }
     }
 
