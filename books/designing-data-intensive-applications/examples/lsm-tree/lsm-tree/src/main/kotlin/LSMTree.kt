@@ -1,4 +1,4 @@
-import serialization.DataSerializer
+import serialization.AvroSerializer
 import java.io.File
 
 /**
@@ -8,16 +8,13 @@ import java.io.File
  */
 class LSMTree(capacity: Int = 100) {
     private val memTable = MemTable(capacity)
-    companion object {
-        val serializer = DataSerializer.JSONSerializer
-    }
 
     init {
         val dir = File("segments")
         if (!dir.exists()) dir.mkdir()
     }
 
-    fun get(key: Long): Any? {
+    fun get(key: String): Any? {
         return memTable.get(key) ?: run {
             var segmentIteratorIndex = getLastSegment()
             while (segmentIteratorIndex > 0) {
@@ -31,7 +28,7 @@ class LSMTree(capacity: Int = 100) {
         }
     }
 
-    fun put(key: Long, value: String) {
+    fun put(key: String, value: String) {
         memTable.put(key, value)
         if (memTable.isFull()) {
             println("Memtable is full, creating new segment...")
@@ -47,19 +44,20 @@ class LSMTree(capacity: Int = 100) {
 
         var biggestSegment = 0L
         file.list().forEach {
-            if (it.toLong() > biggestSegment) biggestSegment = it.toLong()
+            val segmentNumber = it.split(".")[0].toLong()
+            if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
     }
 
     class MemTable(private val capacity: Int = 100) {
-        private val map = mutableMapOf<Long, Any>()
+        private val map = mutableMapOf<String, String>()
 
-        fun get(key: Long): Any? {
+        fun get(key: String): Any? {
             return map[key]
         }
 
-        fun put(key: Long, value: Any) {
+        fun put(key: String, value: String) {
             map[key] = value
         }
 
@@ -76,28 +74,23 @@ class LSMTree(capacity: Int = 100) {
 
     class Segment {
 
-        private var content: Map<Long, Any>? = null
-        private val fileDir: String
+        private var content: Map<String, String>? = null
+        private val segmentID: String
+        private val serializer = AvroSerializer()
 
-        constructor(fileDir: String, content: Map<Long, Any>) {
-            this.fileDir = fileDir
+        constructor(segmentID: String, content: Map<String, String>) {
+            this.segmentID = segmentID
             this.content = content
 
-            val file = File("segments/$fileDir")
-            file.createNewFile()
-            file.writeBytes(serializer.serialize(content))
+            serializer.write(content, segmentID)
         }
 
         constructor(fileDir: String) {
-            this.fileDir = fileDir
-
-            val file = File("segments/$fileDir")
-            file.takeIf { it.exists() }?.let {
-                content = serializer.deserialize(it.readBytes()) as Map<Long, Any>?
-            }
+            this.segmentID = fileDir
+            this.content = serializer.read(fileDir)
         }
 
-        fun get(key: Long): Any? {
+        fun get(key: String): String? {
             return content?.get(key)
         }
     }

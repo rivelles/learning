@@ -8,7 +8,7 @@ fun main() {
     while (!isExited) {
         val nextCommand = readLine()!!.split(" ")
 
-        val key = nextCommand[1].toLong()
+        val key = nextCommand[1]
 
         when (nextCommand[0]) {
             "put" -> lsmTree.put(key, nextCommand[2])
