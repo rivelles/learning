@@ -1,6 +1,11 @@
 import com.google.gson.Gson
 import java.io.File
 
+/**
+ * A simple implementation of a Log-Structured Merge Tree. It's only supposed to be used as a learning tool, as it doesn't
+ * have any optimization and uses a map as the in-memory table so we don't need to worry about search algorithms
+ * and how to store low-level data in memory.
+ */
 class LSMTree(capacity: Int = 100) {
     private val memTable = MemTable(capacity)
 
