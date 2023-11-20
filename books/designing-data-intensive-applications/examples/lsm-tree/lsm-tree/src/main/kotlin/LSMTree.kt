@@ -1,4 +1,4 @@
-import com.google.gson.Gson
+import serialization.DataSerializer
 import java.io.File
 
 /**
@@ -8,6 +8,9 @@ import java.io.File
  */
 class LSMTree(capacity: Int = 100) {
     private val memTable = MemTable(capacity)
+    companion object {
+        val serializer = DataSerializer.JSONSerializer
+    }
 
     init {
         val dir = File("segments")
@@ -75,15 +78,14 @@ class LSMTree(capacity: Int = 100) {
 
         private var content: Map<Long, Any>? = null
         private val fileDir: String
-        private val gson = Gson()
 
-        constructor(fileDir: String, content: Map<Long, Any>?) {
+        constructor(fileDir: String, content: Map<Long, Any>) {
             this.fileDir = fileDir
             this.content = content
 
             val file = File("segments/$fileDir")
             file.createNewFile()
-            file.writeText(gson.toJson(content))
+            file.writeBytes(serializer.serialize(content))
         }
 
         constructor(fileDir: String) {
@@ -91,7 +93,7 @@ class LSMTree(capacity: Int = 100) {
 
             val file = File("segments/$fileDir")
             file.takeIf { it.exists() }?.let {
-                content = gson.fromJson(it.readText(), Map::class.java) as Map<Long, Any>?
+                content = serializer.deserialize(it.readBytes()) as Map<Long, Any>?
             }
         }
 
