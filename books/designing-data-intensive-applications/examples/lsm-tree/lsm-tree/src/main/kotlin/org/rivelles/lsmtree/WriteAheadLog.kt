@@ -19,9 +19,7 @@ class WriteAheadLog {
     }
 
     fun write(key: String, value: String) {
-        val writer = file.outputStream().writer()
-        writer.appendLine("$key:$value")
-        writer.close()
+        file.appendText("$key:$value\n")
 
         currentLog++
     }
