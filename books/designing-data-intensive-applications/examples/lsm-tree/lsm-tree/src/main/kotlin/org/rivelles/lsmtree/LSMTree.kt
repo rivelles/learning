@@ -1,6 +1,7 @@
-import serialization.AvroSerializer
+package org.rivelles.lsmtree
+
+import org.rivelles.lsmtree.serialization.AvroSerializer
 import java.io.File
-import java.io.OutputStreamWriter
 
 /**
  * A simple implementation of a Log-Structured Merge Tree. It's only supposed to be used as a learning tool, as it doesn't
@@ -66,69 +67,5 @@ class LSMTree(capacity: Int = 100) {
             if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
-    }
-
-    class MemTable(private val capacity: Int = 100) {
-        private val map = mutableMapOf<String, String>()
-
-        fun get(key: String): Any? = map[key]
-
-        fun put(key: String, value: String) {
-            map[key] = value
-        }
-
-        fun isFull() = map.size >= capacity
-
-        fun clear() = map.clear()
-
-        fun createSegment(nextSegment: Long) = Segment(nextSegment.toString(), map)
-    }
-
-    class Segment {
-
-        private var content: Map<String, String>? = null
-        private val segmentID: String
-        private val serializer = AvroSerializer()
-
-        constructor(segmentID: String, content: Map<String, String>) {
-            this.segmentID = segmentID
-            this.content = content
-
-            serializer.write(content, segmentID)
-        }
-
-        constructor(fileDir: String) {
-            this.segmentID = fileDir
-            this.content = serializer.read(fileDir)
-        }
-
-        fun get(key: String): String? {
-            return content?.get(key)
-        }
-    }
-
-    class WriteAheadLog {
-        private var currentLog = 0
-        private val file = File("wal/wal.log")
-
-        fun initialize() {
-            val dir = File("wal")
-
-            if (!dir.exists()) {
-                dir.mkdir()
-            }
-            if (!file.exists()) {
-                file.createNewFile()
-            }
-            currentLog = file.readLines().size
-        }
-
-        fun write(key: String, value: String) {
-            val writer = file.outputStream().writer()
-            writer.appendLine("$key:$value")
-            writer.close()
-
-            currentLog++
-        }
     }
 }

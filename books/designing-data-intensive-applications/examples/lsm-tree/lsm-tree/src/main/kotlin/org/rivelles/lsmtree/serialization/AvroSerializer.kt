@@ -1,4 +1,4 @@
-package serialization
+package org.rivelles.lsmtree.serialization
 
 import org.apache.avro.Schema
 import org.apache.avro.file.DataFileReader

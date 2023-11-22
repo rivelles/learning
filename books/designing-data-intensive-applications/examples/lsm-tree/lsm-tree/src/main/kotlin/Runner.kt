@@ -1,3 +1,5 @@
+import org.rivelles.lsmtree.LSMTree
+
 fun main() {
     println("Set initial capacity of memtable: ")
     val capacity = readLine()!!.toInt()
