@@ -20,7 +20,6 @@ class WriteAheadLog {
 
     fun write(key: String, value: String) {
         file.appendText("$key:$value\n")
-
         currentLog++
     }
 }

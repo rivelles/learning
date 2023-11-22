@@ -1,18 +1,20 @@
 package org.rivelles.lsmtree
 
-import org.rivelles.lsmtree.serialization.AvroSerializer
 import java.io.File
+import java.net.ServerSocket
 
 /**
  * A simple implementation of a Log-Structured Merge Tree. It's only supposed to be used as a learning tool, as it doesn't
  * have any optimization and uses a map as the in-memory table so we don't need to worry about search algorithms
  * and how to store low-level data in memory.
  */
-class LSMTree(capacity: Int = 100) {
+class LSMTree(capacity: Int = 100, port: Int) {
     private val memTable = MemTable(capacity)
     private val wal = WriteAheadLog()
+    private val serverSocket = ServerSocket(port)
 
-    init {
+    fun initialize() {
+        println("Creating segments directory...")
         val dir = File("segments")
         if (!dir.exists()) dir.mkdir()
         wal.initialize()
@@ -67,5 +69,15 @@ class LSMTree(capacity: Int = 100) {
             if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
+    }
+
+    fun startServer()  {
+        println("Server started and waiting for connection.")
+        println("I'm working in thread ${Thread.currentThread().name}")
+        Thread.sleep(2000)
+        val clientSocket = serverSocket.accept()
+        println("Client connected.")
+        val input = clientSocket.getInputStream().bufferedReader().readLine()
+        println(input)
     }
 }
