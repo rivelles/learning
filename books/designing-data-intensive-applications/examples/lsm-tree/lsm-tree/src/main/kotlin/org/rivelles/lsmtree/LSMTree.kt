@@ -74,7 +74,6 @@ class LSMTree(capacity: Int = 100, port: Int) {
     fun startServer()  {
         println("Server started and waiting for connection.")
         println("I'm working in thread ${Thread.currentThread().name}")
-        Thread.sleep(2000)
         val clientSocket = serverSocket.accept()
         println("Client connected.")
         val input = clientSocket.getInputStream().bufferedReader().readLine()
