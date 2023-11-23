@@ -7,11 +7,10 @@ fun main() = runBlocking {
     println("Set initial capacity of memtable: ")
     val capacity = readLine()!!.toInt()
     println("Database is starting...")
-    val lsmTree = LSMTree(capacity, 9777)
-    println("I'm working in thread ${Thread.currentThread().name}")
+    val lsmTree = LSMTree(capacity)
     lsmTree.initialize()
     launch(Dispatchers.IO) {
-        lsmTree.startServer()
+        lsmTree.startTCPServer(9777)
     }
     println("Database running!")
 
@@ -27,9 +26,4 @@ fun main() = runBlocking {
             "exit" -> isExited = true
         }
     }
-}
-
-fun test()
-{
-    println("Hello World")
 }

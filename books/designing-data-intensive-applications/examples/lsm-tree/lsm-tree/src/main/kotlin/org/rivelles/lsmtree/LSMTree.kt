@@ -8,25 +8,16 @@ import java.net.ServerSocket
  * have any optimization and uses a map as the in-memory table so we don't need to worry about search algorithms
  * and how to store low-level data in memory.
  */
-class LSMTree(capacity: Int = 100, port: Int) {
+class LSMTree(capacity: Int = 100) {
     private val memTable = MemTable(capacity)
     private val wal = WriteAheadLog()
-    private val serverSocket = ServerSocket(port)
+    private lateinit var serverSocket: ServerSocket
 
     fun initialize() {
         println("Creating segments directory...")
         val dir = File("segments")
         if (!dir.exists()) dir.mkdir()
         wal.initialize()
-    }
-
-    private fun runLoggingTime(operation: String, function: () -> Any?): Any? {
-        val startTime = System.currentTimeMillis()
-        val returnedValue = function()
-        val endTime = System.currentTimeMillis()
-        println("$operation executed. Time elapsed: ${endTime - startTime} ms")
-
-        return returnedValue
     }
 
     fun get(key: String): Any? {
@@ -59,6 +50,23 @@ class LSMTree(capacity: Int = 100, port: Int) {
         }
     }
 
+    fun startTCPServer(port: Int)  {
+        serverSocket = ServerSocket(port)
+        println("Server started and waiting for connection.")
+        val clientSocket = serverSocket.accept()
+        val input = clientSocket.getInputStream().bufferedReader().readLine()
+        println(input)
+    }
+
+    private fun runLoggingTime(operation: String, function: () -> Any?): Any? {
+        val startTime = System.currentTimeMillis()
+        val returnedValue = function()
+        val endTime = System.currentTimeMillis()
+        println("$operation executed. Time elapsed: ${endTime - startTime} ms")
+
+        return returnedValue
+    }
+
     private fun getLastSegment(): Long {
         val file = File("segments")
         if (file.list().isEmpty()) return 0
@@ -69,14 +77,5 @@ class LSMTree(capacity: Int = 100, port: Int) {
             if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
-    }
-
-    fun startServer()  {
-        println("Server started and waiting for connection.")
-        println("I'm working in thread ${Thread.currentThread().name}")
-        val clientSocket = serverSocket.accept()
-        println("Client connected.")
-        val input = clientSocket.getInputStream().bufferedReader().readLine()
-        println(input)
     }
 }
