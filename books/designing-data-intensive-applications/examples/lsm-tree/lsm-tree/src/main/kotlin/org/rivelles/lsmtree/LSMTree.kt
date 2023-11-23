@@ -12,6 +12,7 @@ class LSMTree(capacity: Int = 100, mode: String) {
     private val mode: String = mode
     private val memTable = MemTable(capacity)
     private val wal = WriteAheadLog()
+    private lateinit var replicasAddresses: MutableList<String>
     private lateinit var serverSocket: ServerSocket
 
     fun initialize() {
@@ -58,7 +59,7 @@ class LSMTree(capacity: Int = 100, mode: String) {
             val clientSocket = serverSocket.accept()
             val input = clientSocket.getInputStream().bufferedReader().readLine()
             if (mode == "RW") {
-                // Register a new replica
+                replicasAddresses.add(input)
             }
             else {
                 // Get wal values and replay them
