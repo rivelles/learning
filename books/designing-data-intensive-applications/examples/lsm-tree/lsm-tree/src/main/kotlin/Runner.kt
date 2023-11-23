@@ -6,11 +6,15 @@ import org.rivelles.lsmtree.LSMTree
 fun main() = runBlocking {
     println("Set initial capacity of memtable: ")
     val capacity = readLine()!!.toInt()
+    println("Set mode (RW or R): ")
+    val mode = readLine()!!
+    println("Select port: ")
+    val port = readLine()!!.toInt()
     println("Database is starting...")
-    val lsmTree = LSMTree(capacity)
+    val lsmTree = LSMTree(capacity, mode)
     lsmTree.initialize()
     launch(Dispatchers.IO) {
-        lsmTree.startTCPServer(9777)
+        lsmTree.runTCPServer(port)
     }
     println("Database running!")
 

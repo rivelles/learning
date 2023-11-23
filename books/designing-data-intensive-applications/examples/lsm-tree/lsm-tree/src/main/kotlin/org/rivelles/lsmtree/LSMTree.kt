@@ -8,7 +8,8 @@ import java.net.ServerSocket
  * have any optimization and uses a map as the in-memory table so we don't need to worry about search algorithms
  * and how to store low-level data in memory.
  */
-class LSMTree(capacity: Int = 100) {
+class LSMTree(capacity: Int = 100, mode: String) {
+    private val mode: String = mode
     private val memTable = MemTable(capacity)
     private val wal = WriteAheadLog()
     private lateinit var serverSocket: ServerSocket
@@ -50,12 +51,19 @@ class LSMTree(capacity: Int = 100) {
         }
     }
 
-    fun startTCPServer(port: Int)  {
+    fun runTCPServer(port: Int)  {
         serverSocket = ServerSocket(port)
-        println("Server started and waiting for connection.")
-        val clientSocket = serverSocket.accept()
-        val input = clientSocket.getInputStream().bufferedReader().readLine()
-        println(input)
+        println("TCP server started and waiting for connection.")
+        while(true) {
+            val clientSocket = serverSocket.accept()
+            val input = clientSocket.getInputStream().bufferedReader().readLine()
+            if (mode == "RW") {
+                // Register a new replica
+            }
+            else {
+                // Get wal values and replay them
+            }
+        }
     }
 
     private fun runLoggingTime(operation: String, function: () -> Any?): Any? {
