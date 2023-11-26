@@ -32,6 +32,7 @@ interface LSMTree {
     }
 
     fun runTCPServer(port: Int)
+    fun readAndExecute(): Boolean
 
     fun runLoggingTime(operation: String, function: () -> Any?): Any? {
         val startTime = System.currentTimeMillis()
@@ -52,21 +53,5 @@ interface LSMTree {
             if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
-    }
-}
-
-internal fun LSMTree.write(key: String, value: String) {
-    fun write(key: String, value: String) {
-        runLoggingTime("Put") {
-            memTable.put(key, value)
-            if (memTable.isFull()) {
-                println("Memtable is full, creating new segment...")
-                val nextSegment = getLastSegment() + 1
-                memTable.createSegment(nextSegment)
-                memTable.clear()
-                println("Segment created successfully!")
-            }
-            wal.write(key, value)
-        }
     }
 }

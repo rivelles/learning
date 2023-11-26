@@ -3,8 +3,8 @@ package app
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.rivelles.lsmtree.db.ReadOnlyLSMTree
 import org.rivelles.lsmtree.db.ReadWriteLSMTree
-import org.rivelles.lsmtree.db.write
 
 fun main() = runBlocking {
     println("Set initial capacity of memtable: ")
@@ -14,8 +14,17 @@ fun main() = runBlocking {
     println("Select port: ")
     val port = readLine()!!.toInt()
     println("Database is starting...")
-    val lsmTree = ReadWriteLSMTree(capacity, port)
-    lsmTree.write("", "")
+    val lsmTree = mode.let {
+        when (it) {
+            "RW" -> ReadWriteLSMTree(capacity, port)
+            "R" -> {
+                println("Enter leader address: ")
+                val leaderAddress = readLine()!!
+                ReadOnlyLSMTree(capacity, port, leaderAddress)
+            }
+            else -> throw Exception("Invalid mode")
+        }
+    }
     lsmTree.initialize()
     launch(Dispatchers.IO) {
         lsmTree.runTCPServer(port)
@@ -24,19 +33,6 @@ fun main() = runBlocking {
 
     var isExited = false
     while (!isExited) {
-        isExited = readAndExecute(lsmTree)
+        isExited = lsmTree.readAndExecute()
     }
-}
-
-private fun readAndExecute(lsmTree: ReadWriteLSMTree): Boolean {
-    val nextCommand = readLine()!!.split(" ")
-
-    val key = nextCommand[1]
-
-    when (nextCommand[0]) {
-        "put" -> lsmTree.put(key, nextCommand[2])
-        "get" -> println(lsmTree.get(key))
-        "exit" -> return true
-    }
-    return false
 }
