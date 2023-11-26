@@ -13,5 +13,5 @@ class MemTable(private val capacity: Int = 100) {
 
     fun clear() = map.clear()
 
-    fun createSegment(nextSegment: Long) = Segment(nextSegment.toString(), map)
+    fun flushToSegment(nextSegment: Long) = Segment.flush(nextSegment.toString(), map)
 }

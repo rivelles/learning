@@ -22,7 +22,7 @@ class ReadOnlyLSMTree(capacity: Int = 100, private val port: Int, val leaderAddr
             if (memTable.isFull()) {
                 println("Memtable is full, creating new segment...")
                 val nextSegment = getLastSegment() + 1
-                memTable.createSegment(nextSegment)
+                memTable.flushToSegment(nextSegment)
                 memTable.clear()
                 println("Segment created successfully!")
             }

@@ -14,7 +14,7 @@ internal class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
             if (memTable.isFull()) {
                 println("Memtable is full, creating new segment...")
                 val nextSegment = getLastSegment() + 1
-                memTable.createSegment(nextSegment)
+                memTable.flushToSegment(nextSegment)
                 memTable.clear()
                 println("Segment created successfully!")
             }

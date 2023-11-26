@@ -8,11 +8,15 @@ class Segment {
     private val segmentID: String
     private val serializer = AvroSerializer()
 
-    constructor(segmentID: String, content: Map<String, String>) {
+    private constructor(segmentID: String, content: Map<String, String>) {
         this.segmentID = segmentID
         this.content = content
 
         serializer.write(content, segmentID)
+    }
+
+    companion object {
+        fun flush(segmentID: String, content: Map<String, String>) { Segment(segmentID, content) }
     }
 
     constructor(fileDir: String) {
