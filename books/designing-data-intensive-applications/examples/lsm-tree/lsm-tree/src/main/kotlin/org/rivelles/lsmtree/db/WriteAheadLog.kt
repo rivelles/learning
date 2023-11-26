@@ -1,4 +1,4 @@
-package org.rivelles.lsmtree
+package org.rivelles.lsmtree.db
 
 import java.io.File
 

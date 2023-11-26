@@ -1,7 +1,10 @@
+package app
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.rivelles.lsmtree.ReadWriteLSMTree
+import org.rivelles.lsmtree.db.ReadWriteLSMTree
+import org.rivelles.lsmtree.db.write
 
 fun main() = runBlocking {
     println("Set initial capacity of memtable: ")
@@ -12,6 +15,7 @@ fun main() = runBlocking {
     val port = readLine()!!.toInt()
     println("Database is starting...")
     val lsmTree = ReadWriteLSMTree(capacity, port)
+    lsmTree.write("", "")
     lsmTree.initialize()
     launch(Dispatchers.IO) {
         lsmTree.runTCPServer(port)

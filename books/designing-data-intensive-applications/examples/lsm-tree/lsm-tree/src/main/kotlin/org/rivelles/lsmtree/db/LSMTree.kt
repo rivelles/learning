@@ -1,4 +1,4 @@
-package org.rivelles.lsmtree
+package org.rivelles.lsmtree.db
 
 import java.io.File
 import java.net.ServerSocket
@@ -52,5 +52,21 @@ interface LSMTree {
             if (segmentNumber > biggestSegment) biggestSegment = segmentNumber
         }
         return biggestSegment
+    }
+}
+
+internal fun LSMTree.write(key: String, value: String) {
+    fun write(key: String, value: String) {
+        runLoggingTime("Put") {
+            memTable.put(key, value)
+            if (memTable.isFull()) {
+                println("Memtable is full, creating new segment...")
+                val nextSegment = getLastSegment() + 1
+                memTable.createSegment(nextSegment)
+                memTable.clear()
+                println("Segment created successfully!")
+            }
+            wal.write(key, value)
+        }
     }
 }

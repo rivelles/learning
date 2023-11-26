@@ -1,4 +1,4 @@
-package org.rivelles.lsmtree
+package org.rivelles.lsmtree.db
 
 class MemTable(private val capacity: Int = 100) {
     private val map = mutableMapOf<String, String>()
