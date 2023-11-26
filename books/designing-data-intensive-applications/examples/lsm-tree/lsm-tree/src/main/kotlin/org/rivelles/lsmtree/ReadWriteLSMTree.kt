@@ -8,7 +8,7 @@ open class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
     private lateinit var replicasAddresses: MutableList<String>
     override val serverSocket = ServerSocket(port)
 
-    override fun put(key: String, value: String) {
+    fun put(key: String, value: String) {
         runLoggingTime("Put") {
             memTable.put(key, value)
             if (memTable.isFull()) {

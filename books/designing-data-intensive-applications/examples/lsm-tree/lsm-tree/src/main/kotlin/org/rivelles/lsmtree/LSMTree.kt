@@ -31,7 +31,6 @@ interface LSMTree {
         }
     }
 
-    fun put(key: String, value: String)
     fun runTCPServer(port: Int)
 
     fun runLoggingTime(operation: String, function: () -> Any?): Any? {
