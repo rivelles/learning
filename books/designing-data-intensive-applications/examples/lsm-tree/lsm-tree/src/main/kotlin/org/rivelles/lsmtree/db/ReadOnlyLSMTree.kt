@@ -4,11 +4,11 @@ import java.math.BigInteger
 import java.net.ServerSocket
 import java.net.Socket
 
-class ReadOnlyLSMTree(capacity: Int = 100, private val port: Int, val leaderAddress: String): LSMTree {
+class ReadOnlyLSMTree(capacity: Int = 100, private val port: Int, private val leaderAddress: String): LSMTree {
     override val memTable = MemTable(capacity)
     override val wal = WriteAheadLog()
     override val serverSocket = ServerSocket(port)
-    val connectionLeader = Socket(leaderAddress.split(":")[0], leaderAddress.split(":")[1].toInt())
+    private val connectionLeader = Socket(leaderAddress.split(":")[0], leaderAddress.split(":")[1].toInt())
 
     var currentOffset: BigInteger = BigInteger.ZERO
 

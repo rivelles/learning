@@ -1,11 +1,12 @@
 package org.rivelles.lsmtree.db
 
 import java.net.ServerSocket
+import java.net.Socket
 
 internal class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
     override val memTable = MemTable(capacity)
     override val wal = WriteAheadLog()
-    private lateinit var replicasAddresses: MutableList<String>
+    private lateinit var replicasAddresses: List<Socket>
     override val serverSocket = ServerSocket(port)
 
     private fun put(key: String, value: String) {
@@ -28,14 +29,21 @@ internal class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
             val input = clientSocket.getInputStream().bufferedReader().readLine()
             if (input.startsWith("follower")) {
                 addReplica(input)
+                replicateWALContent()
             }
+        }
+    }
+
+    private fun replicateWALContent() {
+        replicasAddresses.parallelStream().forEach {
+            wal.getStream().copyTo(it.getOutputStream())
         }
     }
 
     private fun addReplica(input: String) {
         val (address, followerPort, offset) = input.split(":")
         println("Follower $address:$followerPort connected with offset $offset")
-        replicasAddresses.add("$address:$followerPort")
+        replicasAddresses = replicasAddresses.plus(Socket(address, followerPort.toInt()))
     }
 
     override fun readAndExecute(): Boolean {

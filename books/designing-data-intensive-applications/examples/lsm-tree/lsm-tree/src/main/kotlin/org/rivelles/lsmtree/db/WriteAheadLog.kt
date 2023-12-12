@@ -22,4 +22,6 @@ class WriteAheadLog {
         file.appendText("$key:$value\n")
         currentLog++
     }
+
+    fun getStream() = file.inputStream()
 }
