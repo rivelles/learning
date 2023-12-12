@@ -20,15 +20,18 @@ class ReadOnlyLSMTree(capacity: Int = 100, private val port: Int, val leaderAddr
             val (key, value) = input.split(":")
             memTable.put(key, value)
             if (memTable.isFull()) {
-                println("Memtable is full, creating new segment...")
-                val nextSegment = getLastSegment() + 1
-                memTable.flushToSegment(nextSegment)
-                memTable.clear()
-                println("Segment created successfully!")
+                createNewSegment()
             }
             wal.write(key, value)
             currentOffset++
         }
+    }
+
+    private fun createNewSegment() {
+        println("Memtable is full, creating new segment...")
+        val nextSegment = getLastSegment() + 1
+        memTable.flushToSegment(nextSegment)
+        println("Segment created successfully!")
     }
 
     override fun readAndExecute(): Boolean {

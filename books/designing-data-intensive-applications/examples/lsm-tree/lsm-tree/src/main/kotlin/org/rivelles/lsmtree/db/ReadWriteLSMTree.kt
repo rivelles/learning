@@ -15,7 +15,6 @@ internal class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
                 println("Memtable is full, creating new segment...")
                 val nextSegment = getLastSegment() + 1
                 memTable.flushToSegment(nextSegment)
-                memTable.clear()
                 println("Segment created successfully!")
             }
             wal.write(key, value)
@@ -28,11 +27,15 @@ internal class ReadWriteLSMTree(capacity: Int = 100, port: Int): LSMTree {
             val clientSocket = serverSocket.accept()
             val input = clientSocket.getInputStream().bufferedReader().readLine()
             if (input.startsWith("follower")) {
-                val (address, followerPort, offset) = input.split(":")
-                println("Follower $address:$followerPort connected with offset $offset")
-                replicasAddresses.add("$address:$followerPort")
+                addReplica(input)
             }
         }
+    }
+
+    private fun addReplica(input: String) {
+        val (address, followerPort, offset) = input.split(":")
+        println("Follower $address:$followerPort connected with offset $offset")
+        replicasAddresses.add("$address:$followerPort")
     }
 
     override fun readAndExecute(): Boolean {
