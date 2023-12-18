@@ -95,3 +95,23 @@ sequenceDiagram
     Leader->>+Follower: INSERT INTO transactions (123, 45.0)
 ```
 
+In order for this to be avoided, we need to make sure that the follower is up-to-date before reading from it. We have 
+some alternatives to do it, such as:
+- When reading something that the user has modified, read it from the leader.
+- Track the last update time and, for some time, read from the leader.
+- Track the update time for each row and when reading from the replica, check if the row is up-to-date.
+
+These are workarounds and can be hard to implement, being prone to inconsistencies and bugs.
+
+#### Monotonic Reads
+
+In the same scenario as above, imagine we have two followers. A user can read from one of them and then from the other.
+It can happen that in the first read, user got the most recent value, but in the second one they may get an older value.
+A guarantee that avoids this anomaly is called **monotonic reads**. It's stronger than eventual consistency, but weaker
+than strong consistency.
+
+### Solutions for Replication Lag
+
+In order to avoid issues as mentioned above, databases can provide some sort of guarantees. _Transactions_ were created
+to provide stronger guarantees, although they are not enough to solve all problems. At some level, eventual consistency
+is needed when we are working in a distributed system.
