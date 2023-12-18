@@ -60,3 +60,38 @@ generated values in the old leader. If those values were used in other systems, 
 - Two nodes may believe they are the leader. Some systems shut down one of the leaders if his is detected.
 - Misconfigured timeouts can cause the system to think the leader is down when it's not, making failovers to happen
 unnecessarily.
+
+### Implementation of Replication Logs
+
+The replication log can be implemented as a sequence of operations. Let's say we are working with a MySQL database. We'd
+replicate each SQL operation in the order they were received. This is called **statement-based replication**. However, 
+it can lead to problems because we need to consider edge cases, such as non-deterministic functions, like `NOW()`; we 
+need to handle concurrency due to changes in the same row.
+
+Due to those problems, another approach is to replicate the changes to the database. This is called **write-ahead log
+(WAL)**. This log is an append-only sequence of bytes, which contains all changes made to a database. This can be used
+to build a replica on a follower.
+
+We can decouple the replication log from the database engine internals by using a **logical log**. It is a sequence of
+records representing write operation in a row-based granularity. This allows leader and follower to use different
+database versions or even storage engines. We can also use it for external applications to read from, this is
+called **change data capture (CDC)**.
+
+### Replication Lag
+
+Working with replication means that we can design a database that can scale for read operations. It's not feasible to
+synchronously replicate all writes to all followers because one single partition failure would make the whole system
+unavailable. So we need to make this process asynchronous, meaning that the followers will be a bit behind the leader.
+This is called **replication lag**.
+
+This can lead to situations like below:
+
+```mermaid
+sequenceDiagram
+    User->>+Leader: INSERT INTO transactions (123, 45.0)
+    Leader->>User: INSERT OK
+    User->>Follower: SELECT * FROM transactions WHERE id=123
+    Follower->>User: No results
+    Leader->>+Follower: INSERT INTO transactions (123, 45.0)
+```
+
