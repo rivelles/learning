@@ -115,3 +115,94 @@ than strong consistency.
 In order to avoid issues as mentioned above, databases can provide some sort of guarantees. _Transactions_ were created
 to provide stronger guarantees, although they are not enough to solve all problems. At some level, eventual consistency
 is needed when we are working in a distributed system.
+
+## Multi-Leader Replication
+
+So far we saw how single-leader replication works. If we want to have the cabaibility of writing to any node, we need
+to use multi-leader replication. This is useful for a multi-datacenter operation: if we have a datacenter in Europe and 
+another in the US, we can have a leader in each datacenter, so that users can write to the closest one.
+
+The biggest challenge of multi-leader replication is handling conflicts that happen when two nodes receive writes at
+the same time.
+
+Other use-cases for this kind of replications are mobile applications that operate off-line and collaborative editing.
+
+### Handling Write Conflicts
+
+Imagine a scenario where two users try to update the title of the same page. We can end-up in a situation like this:
+
+```mermaid
+sequenceDiagram
+    User 1->>+Leader 1: UPDATE pages SET title='A'
+    Leader 1->>User 1: UPDATE OK
+    User 2->>Leader 2: UPDATE pages SET title='B'
+    Leader 2->>User 2: UPDATE OK
+    Leader 1->>Leader 2: CONFLICT
+    Leader 2->>Leader 1: CONFLICT
+```
+
+In principle, this could be avoided by synchronously replicating writes between leaders. However, this would make the
+system to lose the main advantages of multi-leader replication. So we need to find a way to handle conflicts.
+
+The first approach is to simply avoid the conflict. This can be achieved if we can guarantee that requests will always
+go to the same leader based on some property. For example, every request for updating user data goes to the same leader.
+
+Given that we can't always avoid conflicts, and also that there is no "correct" write values that happened in a conflict,
+we need to converge to a final value. This can be done in some ways:
+- **Last write wins (LWW)**: the last write to be received is the one that wins. This is usually implemented by attaching
+a timestamp to each write and choosing the one with the most recent timestamp.
+- **Merge values**: if the data type allows it, we can merge the values. For example, the merged title would be "A/B".
+- **Record conflicts**: record conflicts in a structure and handle it through application code.
+
+### Replication Topologies
+
+Various different topologies are possible for multi-leader replication. Some of them are:
+
+Circular
+
+```mermaid
+flowchart LR
+    A[Node] --> B[Node]
+    B[Node] --> C[Node]
+    C[Node] --> A[Node]
+```
+
+Star
+
+```mermaid
+flowchart LR
+    A[Node] --> B[Node]
+    B[Node] --> A[Node]
+    B[Node] --> C[Node]
+    C[Node] --> B[Node]
+    B[Node] --> D[Node]
+    D[Node] --> B[Node]
+```
+
+All to all
+
+```mermaid
+flowchart LR
+    A[Node] <--> B[Node]
+    A[Node] <--> C[Node]
+    B[Node] <--> C[Node]
+```
+
+One of the issues with circular and star topologies is that if one node fails, the whole system can become unavailable.
+
+All-to-all topologies are more resilient to failures, but they can also present problems. Imagine two users are updating
+a key, it could happen that the key ends up having different values in different replicas:
+
+```mermaid
+sequenceDiagram
+    User 1->>+Leader 1: INSERT INTO data (1, 1.0)
+    Leader 1->>User 1: UPDATE OK
+    Leader 1->>Leader 3: INSERT INTO data (1, 1.0)
+    User 2->>Leader 3: UPDATE data SET value=2.0
+    Leader 3->>User 2: UPDATE OK
+    Leader 3->>Leader 2: UPDATE data SET value=2.0
+    Leader 1->>Leader 2: INSERT INTO data (1, 1.0)
+```
+
+In this scenario, leader 2 will be inconsistent because it received the replication from leader 1 after the one from
+leader 3.
