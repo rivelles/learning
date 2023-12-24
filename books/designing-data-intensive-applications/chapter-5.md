@@ -206,3 +206,39 @@ sequenceDiagram
 
 In this scenario, leader 2 will be inconsistent because it received the replication from leader 1 after the one from
 leader 3.
+
+## Writing to the DB when a node is down
+
+In a typical quorum system, we need the majority of nodes to acknowledge a write before reporting success to the client.
+It can happen that one of the replicas is down, so a write is considered successful even though it was not replicated
+to all nodes.
+
+If this node comes back, it might have a different value for some keys. If a client requests the value for them, it
+might get stale values. To avoid this, read requests can be sent to all nodes in parallel and the most recent value 
+can be returned.
+
+In order to repair the stale values, we can use:
+- **Read repair**: when a client reads a stale value, it can write it back to the database with a newer timestamp.
+- **Anti-entropy process**: a background process that compares data between two replicas and copies the most recent
+value to the other replica.
+
+## Quorum Consistency
+
+Quorums can be defined when reading and/or writing data. It`s the minimum number of replicas that need to be available
+in order to perform the operation.
+
+If we have 3 nodes and a quorum of 2 for both writes and reads, it means that we can expect to get the most recent
+value when reading, because if one node is down, the write will fail on it, but when reading, we are sure that at least
+one of the nodes that received the write will have the value.
+
+```
+w + r > n
+```
+
+Typically, we can make n an odd number and set w and r to be (n+1)/2. This way, we can tolerate up to (n-1)/2 failures.
+
+In practice, some edge cases can happen:
+- Two writes can happen at the same time without clear winner.
+- A write and a read can happen at the same time, where the read gets the value before the write.
+- If a write failed in more than w and not rolled back, it can be read by a client.
+- A node fail and gets restored with a replica that is not up-to-date.
