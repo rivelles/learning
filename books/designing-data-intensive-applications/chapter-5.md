@@ -249,3 +249,32 @@ If a node is down, we might not reach the quorum. In this case, we can still wri
 that aren't within the `n` nodes. This is called **sloppy quorum**.
 
 When the node comes back, we can send the writes that were not replicated to it. This is called **hinted handoff**.
+
+## Concurrency
+
+It's usually said that concurrency happens when two operations happen at the same time. However, this is misleading
+due to the fact that we need to trust clocks of machines, which can be different.
+
+So, we say that two concurrent operations are operations that don't know about each other.
+
+A and B won't be concurrent if:
+- B knows about A
+- B depends on A
+- B is built upon A
+
+To do that, the server can maintain a version number for each key. When a client wants to write to a key, it needs to
+provide the version number of the last read. If the version number is different, it means that another client wrote to
+the key. In this case, a concurrent write happened and the client can, for example, merge the values. This, however,
+requires the client to read the value before writing to it.
+
+## Write Conflicts
+
+Conflicts happen when two nodes receive writes concurrently and replicate to the other nodes. This might make some nodes
+to have different values for the same key. There are some techniques to handle this:
+
+### Last write wins (LWW)
+
+Each replica only stores the most recent value for each key. This is usually implemented by attaching a timestamp to
+each write and choosing the one with the most recent timestamp. One of the problems with this approach is that it can
+lead to data loss. Some write operations will be considered successful, but they will be overwritten by a more recent
+write.
