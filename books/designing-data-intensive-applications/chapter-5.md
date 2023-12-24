@@ -242,3 +242,10 @@ In practice, some edge cases can happen:
 - A write and a read can happen at the same time, where the read gets the value before the write.
 - If a write failed in more than w and not rolled back, it can be read by a client.
 - A node fail and gets restored with a replica that is not up-to-date.
+
+### Sloppy Quorums and Hinted Handoff
+
+If a node is down, we might not reach the quorum. In this case, we can still write to the available nodes and to others
+that aren't within the `n` nodes. This is called **sloppy quorum**.
+
+When the node comes back, we can send the writes that were not replicated to it. This is called **hinted handoff**.
