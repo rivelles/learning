@@ -49,3 +49,78 @@ such as:
 Although it avoids hot spots, it has a downside: it's not possible to efficiently query a range of keys. Also, if we
 always insert the same key, it will always go to the same partition, which will eventually become a hot spot, making
 the data skewed.
+
+### Skewed workloads
+
+Even with a hash function, it's possible to have skewed workloads. Imagine a scenario of a social network, where the key
+is the user ID. Depending on the interactions a very famous user has, the partition that stores them will become a hot
+spot. This is called a **skewed workload**.
+
+## Partitioning and Secondary Indexes
+
+Sometimes, it's not enough to have only one key, because we might want to query our data in a different way. For example,
+find all users that live in a certain city, or all cars with a certain color. In order to achieve that, we need to
+use a **secondary index**. These also need to be partitioned, and there are two ways to do it.
+
+### Partitioning secondary indexes by document
+
+In this approach, the secondary index is partitioned in the same way as the primary key, i.e., the secondary index will
+be stored in the same partition as the document it refers to.
+
+```mermaid
+flowchart 
+    A["PARTITION 0 
+    Primary key index:
+    1 -> [city: 'Sao Paulo']
+    2 -> [city: 'Rio de Janeiro']
+    ---------------------------
+    Secondary index:
+    city:'Sao Paulo' -> [1]
+    city:'Rio de Janeiro' -> [2]"]
+    
+    B["PARTITION 1 
+    Primary key index:
+    3 -> [city: 'Curitiba']
+    4 -> [city: 'Sao Paulo']
+    ---------------------------
+    Secondary index:
+    city:'Curitiba' -> [3]
+    city:'Sao Paulo' -> [4]"]
+    
+    C[User: Give me all users in Sao Paulo] --> A
+    C --> B
+```
+
+The advantage of this is that, when writing, we only need to write to one partition. However, when reading, we need to
+query all partitions and merge the results. This is called a **scatter/gather** approach.
+
+### Partitioning secondary indexes by term
+
+In this approach, the secondary index in independent of the primary key, since it's partitioned by the term itself, or
+using a hash of the term.
+
+```mermaid
+flowchart 
+    A["PARTITION 0 
+    Primary key index:
+    1 -> [city: 'Sao Paulo']
+    2 -> [city: 'Rio de Janeiro']
+    ---------------------------
+    Secondary index:
+    city:'Sao Paulo' -> [1, 4]
+    city:'Rio de Janeiro' -> [2]"]
+    
+    B["PARTITION 1 
+    Primary key index:
+    3 -> [city: 'Curitiba']
+    4 -> [city: 'Sao Paulo']
+    ---------------------------
+    Secondary index:
+    city:'Curitiba' -> [3]
+    
+    C[User: Give me all users in Sao Paulo] --> A
+```
+
+The main advantage of this approach is that we don't need to query all partitions if we are looking for a specific term.
+However, when writing, it becomes more expensive, since we might need to write to multiple partitions. Also, updates to
+these secondary indexes are asynchronous.
