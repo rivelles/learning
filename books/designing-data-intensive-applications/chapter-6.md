@@ -124,3 +124,72 @@ flowchart
 The main advantage of this approach is that we don't need to query all partitions if we are looking for a specific term.
 However, when writing, it becomes more expensive, since we might need to write to multiple partitions. Also, updates to
 these secondary indexes are asynchronous.
+
+## Rebalancing partitions
+
+When we add a new partition, we need to move some data from the existing partitions to the new one. This is called
+**rebalancing**.
+
+### Strategies for Rebalancing
+
+#### Fixed number of partitions
+
+The simplest approach is to assign many more partitions than the number of machines we have. For example, a database
+with 10 nodes may be split into 100 partitions.
+
+When a new node is added to the cluster, it can steal a few partitions from an existing nodes. If a node is removed,
+its partitions can be distributed to the remaining ones.
+
+The advantage of this approach is that we don't need to move a lot of data when a new node is added.
+
+The number of partitions we configure will be the maximum number of nodes we can have in the cluster.
+
+Keeping a lot of partitions is expensive, so we need to find a balance in this number, and it's usually not trivial.
+The correct number of partitions is "just right". Neither too big, nor too small.
+
+#### Dynamic partitioning
+
+Some key-range partitioning schemes usually create partitions dynamically. When a partition grows above a specific
+size (example: 10GB), it's split into two partitions. At the same time, if a lot of data is deleted from a partition,
+and it falls below a certain size, it can be merged with another partition, similarly to what happens in a B-Tree.
+
+The main advantage of this is that the number of partitions will adapt according to the data size. However, a caveat
+is that we'd start with just one partition, so if we have multiple nodes, only one of them will be used. To mitigate
+this, we can start with a fixed number of partitions.
+
+#### Partitioning proportionally to nodes
+
+In this approach, the number of partitions is proportional to the number of nodes. For example, if we have 4 nodes, we
+can have 12 partitions. This way, each  node  will have 3 partitions.
+
+We'll aim to always have this proportion, otherwise we can create hot spots. For example, if we add a new node  to the
+cluster, we'll end up with 5 nodes and 12 partitions, which means that one node will have 4 partitions, while the others
+will have 3. This is not ideal, so we need to rebalance the partitions. We can do this by splitting the partitions that
+have more data, or by merging the ones that have less data. In the example, we could end up with 15 partitions.
+
+## Request Routing
+
+When a client wants to read or write data, it needs to know which partition to contact. There are some approaches for
+that:
+- Client can contact any node, if that node contains the data, it will serve the request. Otherwise, it will forward
+the request to the correct node.
+- Client can contact a routing tier first, which will tell the client which node to contact.
+
+Some systems use a coordinator service, such as ZooKeeper, to keep track of which nodes are in the cluster. Other actors
+can query ZooKeeper to find out which node to contact for a given key.
+
+```mermaid
+flowchart TD
+    A[Client] -->|get 'John'| B[Routing tier]
+    B -->|'John'| C[Zookeeper]
+    C -->|'Node 2'| B
+    D[Node 1]
+    B -->|Replication stream| E[Node 2]
+    F[Node 3]
+    G[Node 3]
+```
+(Sorry about the diagram, I can't figure out how to make it look better)
+
+Some databases, such as Cassandra, use a gossip protocol to keep track of the changes in the cluster. Requests can be 
+sent to any node, which will forward the request to the correct node. This adds more complexity to the system, but it
+makes it more resilient to failures, because it doesn't have a single point of failure, such as ZooKeeper.
