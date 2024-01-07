@@ -116,7 +116,7 @@ flowchart
     4 -> [city: 'Sao Paulo']
     ---------------------------
     Secondary index:
-    city:'Curitiba' -> [3]
+    city:'Curitiba' -> [3]"]
     
     C[User: Give me all users in Sao Paulo] --> A
 ```
