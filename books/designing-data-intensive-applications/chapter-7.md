@@ -58,3 +58,62 @@ So, some databases implement **snapshot isolation**. We'll talk about it later.
 It's the promise that once a transaction has been committed, it will remain so. Typically, it means that the data 
 will be written to a non-volatile storage. It usually considers the write-ahead log or something similar. Also, in 
 replicated databases, it means that the data has been successfully copied to some number of nodes.
+
+## Multi-Object Operations
+
+Multi-object transactions are needed when we want to update several objects at once. For example, imagine a database
+that stores bank account balances with two tables: accounts and transactions. The accounts table contains the current
+balance of each account, and the transactions table contains the history of transactions. When a transaction is made,
+a new row is inserted into the transactions table, and the balance of the account is updated in the accounts table.
+
+```mermaid
+sequenceDiagram
+    User 1->>+Database: insert into transactions (account_id, amount) values (1, 50)
+    Database->>User 1: ok
+    User 2->>+Database: select balance from accounts where account_id = 1
+    Database->>User 2: balance = 0
+    User 1->>+Database: update accounts set balance = balance + 50 where account_id = 1
+    Database->>User 1: OK
+```
+
+This shows the need for _atomicity_. Imagine if an error occurs after the transaction is inserted, but before the account
+balance is updated. The account balance would be inconsistent with the transaction history.
+
+Many distributed databases abandoned multi-object transactions because it is hard to implement them when we are dealing
+with partitions.
+
+## Single-Object Operations
+
+If you want to update a single object, a transaction can be used:
+- If you are writing a big object, such as a JSON document, and there is an error in the middle of the write
+- If you are overriding a value and there is an outage in the middle of the write
+- If another client reads the same object at the same time a write is happening, which value should they see?
+
+In these cases, _atomicity_ can be achieved by using logs for crash recovery and _isolation_ can be achieved by using 
+locks.
+
+## Handling Errors
+
+When a transaction is aborted in a system that guarantees ACID properties, the database will discard any changes that
+were made, and it can be retried by the application.
+
+Although this is simple, it is not perfect:
+- The transaction can actually be succeeded but the client didn't receive the successful commit. In this case, the
+client may retry the same transaction.
+- If the error is due to some overload, retrying the transaction may make the problem worse.
+- A retry would be pointless if the error was caused due to a non-transient error, such as a violated foreign-key.
+
+## Weak Isolation Levels
+
+Race conditions happen when two transactions are trying to read and write the same data concurrently.
+
+In theory, the strongest isolation level would make the developers think that there is no concurrency at all, because
+all transactions are executed in a **serial** order. However, this is not practical, because it would be too slow. In
+practice, systems work with weaker isolation levels, so they are protected against **some** concurrency issues.
+
+A popular comment is: Use ACID databases when you are handling financial data. However, due to the fact that popular
+databases use weak isolation, they won't necessarily prevent bugs to happen.
+
+Taking this into account, we can't simply ignore concurrency issues, we need to have a good understanding on which 
+things can go wrong, and how to avoid them using the tools we have.
+
