@@ -117,3 +117,87 @@ databases use weak isolation, they won't necessarily prevent bugs to happen.
 Taking this into account, we can't simply ignore concurrency issues, we need to have a good understanding on which 
 things can go wrong, and how to avoid them using the tools we have.
 
+### Read Committed
+
+The guarantees it makes are:
+1. When reading, we'll always see data that was already committed (no dirty reads).
+2. When writing, we'll only overwrite data that was already committed (no dirty writes).
+
+```mermaid
+sequenceDiagram
+    User 1->>+Database: set x = 3
+    Database->>User 1: ok
+    User 2->>+Database: get x
+    Database->>User 2: x = 2
+    User 1->>+Database: commit
+    User 2->>+Database: get x
+    Database->>User 2: x = 3
+```
+Read committed is one of the most popular isolation levels, being the default setting in many databases.
+
+To prevent dirty writes, row-level locks are used. When a transaction wants to write to a row, it first needs to
+acquire a lock on that row. If another transaction already has a lock on that row, the second needs to wait until the 
+first commits or aborts.
+
+To prevent dirty reads, locks could be used as well, however, it would cause a lot of slowness, since long-running 
+writes could block reads for a long time. So, instead of that, databases keep track of both values when a transaction
+is writing a new value. When a transaction reads a value, it will check if the value was committed. If it was, it will
+return the value. If it wasn't, it will return the old value.
+
+### Snapshot Isolation and Repeatable Read
+
+With read committed, we can still have concurrency issues:
+
+```mermaid
+sequenceDiagram
+    User 1->>+Account 1: select balance from accounts where id = 1
+    Account 1->>User 1: balance = 500
+    Transaction->>Account 1: update accounts set balance = balance + 100 where id = 1
+    Account 1->>Transaction: ok: balance = 600
+    Transaction->>Account 2: update accounts set balance = balance - 100 where id = 1
+    Account 2->>Transaction: ok: balance = 400
+    Transaction->>Account 2: commit
+    User 1->>Account 2: select balance from accounts where id = 2
+    Account 2->>User 1: balance = 400
+```
+
+Here, user 1 is trying to transfer money from account 2 to account 1. In total, they should have 1000, but at the moment
+user 1 queried both accounts, the sum was 900, because when they queried account 1, the transaction was not committed
+yet, but when they queried account 2, it was already committed. 
+
+This is called a **read skew** and is an example of a **non-repeatable read**. It happens when a transaction reads the
+same row twice, but the result of the second read is different from the first one. If the user tries to query both 
+accounts again, they will see the correct balance. It's considered acceptable in a read committed isolation.
+
+However, some use cases cannot tolerate this kind of problem:
+- Backups: If you want to take a backup of the database, you will need to read all data, which takes a long time.
+While this happens, more writes are coming, so we could end up with some parts containing old data and some parts
+containing new data.
+- Analytics: If a query scans a large part of data, it could take a long time and may return nonsensical results.
+
+
+The most common solution for this is to use **snapshot isolation**. The idea is that transactions will read from a
+snapshot of the database. When a transaction starts, it will see data that was committed in the start of it.
+
+In order to implement it, databases use locks to prevent dirty writes, but reads do not require any locks. This allows
+the database to execute long-running read queries on a snapshot while accepting writes.
+
+#### Implementing Snapshot Isolation with MVCC
+
+The most common way to implement snapshot isolation is by using **multi-version concurrency control (MVCC)**. The idea
+is that the database must keep several committed versions of an object, since different transactions will need to see
+them in different points in time.
+
+```mermaid
+sequenceDiagram
+    Transaction txid = 12->>Database: select balance from accounts where id = 1
+    Database->>Transaction txid = 12: 500 (id = 1, created by txid = 11, deleted by null, balance = 500)
+    Transaction txid = 13->>+Database: update accounts set balance = balance + 100 where id = 1
+    Database->>Transaction txid = 13: ok [(id = 1, created by txid = 11, deleted by txid = 13, balance = 500), id = 1, created by txid = 13, deleted by null, balance = 600]
+    Transaction txid = 13->>+Database: update accounts set balance = balance - 100 where id = 2
+    Database->>Transaction txid = 13: ok [(id = 2, created by txid = 12, deleted by txid = 13, balance = 500), id = 2, created by txid = 13, deleted by null, balance = 400]
+    Transaction txid = 13->>Database: commit
+    Transaction txid = 12->>Database: select balance from accounts where id = 2
+    Database->>Transaction txid = 12: 500 (id = 2, created by txid = 12, deleted by null, balance = 500)
+    Transaction txid = 12->>Database: commit
+```
