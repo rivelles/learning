@@ -222,6 +222,13 @@ needs to read it, the query will filter out the versions that are not visible to
 Some databases that use B-Tree indexes use an append-only variant, meaning that when a row is updated by a transaction,
 a new copy of the page is written, and the parent pages are updated to point to the new page.
 
+#### Naming of snapshot isolation
+
+The name snapshot isolation is not used by all databases. For example, Postgres calls it **repeatable read**, Oracle 
+calls it **serializable** and SQL Server calls it **snapshot isolation**.
+
+MySQL is not qualified as snapshot isolation because it doesn't detect lost updates automatically. 
+
 ### Preventing Lost Updates
 
 One of the most common concurrency problems is the **lost update**. It happens when two transactions concurrently
@@ -232,10 +239,64 @@ perform a read-modify-write cycle. For example:
 
 A variety of solutions have been proposed to solve this problem:
 
-#### Atomic write operations
+#### 1- Atomic write operations
 
 Operations provided by the database that removes the need of the application to read the value before writing it.
 
 ```sql
 UPDATE counters SET value = value + 1 WHERE id = 1;
 ```
+This will take an exclusive lock on the object when they read it, so no other transaction will be able to access it
+until it gets committed or aborted.
+
+Not all cases fit for this solution. For example, if a user wants to update a wiki page it would involve text editing.
+
+#### 2- Explicit locking
+
+Some databases provide a way to explicitly lock objects during a transaction. In a multiplayer game, for example,
+a character would only be moved by one user at a time, but it also involves some logic, so we can't use atomic writes.
+
+```sql
+BEGIN TRANSACTION;
+SELECT * FROM characters WHERE id = 1234 FOR UPDATE;
+
+-- Application logic to move the character
+
+UPDATE characters SET x = 1, y = 2 WHERE id = 1234;
+COMMIT;
+```
+
+#### Detecting Lost Updates
+
+The options we saw above try to prevent lost updates by making transactions run in a serializable order. However,
+we can allow them to run concurrently and make the transaction manager detect lost updates.
+
+This makes the application simpler, because developers might forget to use explicit locks or atomic writes. With this
+approach we make the solution less error-prone.
+
+#### 3- Compare-and-set
+
+Some databases adopt a different approach. With compare-and-set, the database will allow an update to happen only if
+the value has not changed since it was last read. This is also called **optimistic concurrency control**.
+
+```sql
+UPDATE pages SET content = 'New content' 
+WHERE id = 1 
+AND content = 'Old content';
+```
+
+This may work or not, because if we use snapshot isolation, the transaction will see the old value, so even if another
+user changed the content, the transaction will still be able to update it.
+
+Before using compare-and-set, we need to check if it's safe or not.
+
+#### Conflict resolution and replication
+
+In replicated databases, preventing lost updates goes to another level, since they have copies of the data on several
+nodes and sometimes different nodes can accept writes for the same key. Techniques we saw until now don't apply here.
+
+A common approach is to use **last write wins**. When a conflict is detected, the last write will overwrite the previous
+one. However, it is prone to cause lost updates.
+
+Another approach is to allow concurrent writes to create different versions of the same object and use application
+logic to merge them after it happened.
