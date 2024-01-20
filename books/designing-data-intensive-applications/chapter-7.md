@@ -201,3 +201,41 @@ sequenceDiagram
     Database->>Transaction txid = 12: 500 (id = 2, created by txid = 12, deleted by null, balance = 500)
     Transaction txid = 12->>Database: commit
 ```
+
+In this example, when transaction 12 starts, it will see the old value of account 1, because it was created by
+transaction 11, which was committed before transaction 12 started.
+
+The rules for snapshot isolation are:
+- When a transaction starts, transactions that are in progress will not be visible.
+- When a transaction starts, writes made by transactions that committed after it started will not be visible.
+- When a transaction starts, writes that were aborted after it started will not be visible.
+
+An object will be visible if both conditions are true:
+- At the time the transaction is reading started, it was already committed.
+- The object is not marked for deletion or the transaction that marked it for deletion has not yet committed.
+
+#### Indexes in snapshot isolation
+
+In a snapshot isolation context, indexes can point to multiple versions of the same object. When a read transaction
+needs to read it, the query will filter out the versions that are not visible to the transaction.
+
+Some databases that use B-Tree indexes use an append-only variant, meaning that when a row is updated by a transaction,
+a new copy of the page is written, and the parent pages are updated to point to the new page.
+
+### Preventing Lost Updates
+
+One of the most common concurrency problems is the **lost update**. It happens when two transactions concurrently
+perform a read-modify-write cycle. For example:
+1. Incrementing a counter or an account balance
+2. Making a local change to a complex value, such as a JSON document
+3. Two users editing a document at the same time, each saving their changes independently
+
+A variety of solutions have been proposed to solve this problem:
+
+#### Atomic write operations
+
+Operations provided by the database that removes the need of the application to read the value before writing it.
+
+```sql
+UPDATE counters SET value = value + 1 WHERE id = 1;
+```
