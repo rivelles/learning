@@ -300,3 +300,77 @@ one. However, it is prone to cause lost updates.
 
 Another approach is to allow concurrent writes to create different versions of the same object and use application
 logic to merge them after it happened.
+
+### Write Skew and Phantoms
+
+The mechanisms we saw until now are not enough to prevent all concurrency issues. For example, imagine a table that
+controls doctors who need to be on-call at a hospital. There is a rule that says that there should be at least one
+doctor on-call at all times.
+
+```mermaid
+sequenceDiagram
+    User 1->>+Database: begin transaction
+    User 1->>+Database: select count(*) from doctors where on_call = true
+    Database->>User 1: 2
+    User 2->>+Database: begin transaction
+    User 2->>+Database: select count(*) from doctors where on_call = true
+    Database->>User 2: 2
+    User 1->>+Database: update doctors set on_call = false where id = 1
+    Database->>User 1: ok
+    User 1->>+Database: commit
+    User 2->>+Database: update doctors set on_call = false where id = 2
+    Database->>User 2: ok
+    User 2->>+Database: commit
+```
+
+In this example, the application controls whether the doctor can remove themselves from the on-call list. However, 
+since the two doctors queried it concurrently, they both got 2 on-calls on the same transaction, since snapshot isolation
+was used. Both transactions committed and now there are no doctors on-call.
+
+This is not a dirty write, since both transactions didn't write to the same object. This is characterized as a **write
+skew**. It's less obvious, but it's still a race condition. If the transactions were running serially, the second one 
+would have failed.
+
+The best option to prevent this without the need to serialize transactions is to explicitly lock the rows that are
+going to be used, for example:
+
+```sql
+BEGIN TRANSACTION;
+SELECT * FROM doctors WHERE on_call = true FOR UPDATE;
+
+UPDATE doctors SET on_call = false WHERE id = 1;
+COMMIT;
+```
+
+More examples of write skew are:
+- **Meeting room booking system**: If two people try to book the same room at the same time, if both transactions run
+concurrently, they will both see that the room is available, and both might book it.
+- **Multiplayer game**: If two players try to move different characters to the same location, they might both see that
+the location is empty and move their characters there.
+- **Claiming a username**: If two users try to claim the same username, they might both see that the username is 
+available and claim it. A unique constraint would help here since the second transaction would fail.
+
+All of these examples follow the same pattern:
+1. A SELECT query runs to check if some requirement is satisfied.
+2. Based on the result of the query, the application decides what to do next.
+3. The application performs an insert/update/delete to make the change.
+4. The precondition that was checked in step 1 is now violated.
+
+We could use the SELECT FOR UPDATE pattern to prevent some of these problems, for example the example of the on-call
+doctors. However, in some examples this would not work, because there would be no rows to lock. There is no row to
+lock in the multiplayer game because the location is empty, and there is no row to lock in the username example because
+the username is available. The initial SELECT query return no rows for both cases.
+
+This effect is called **phantom**. It happens when a write in one transaction affects the result of a query in another
+transaction.
+
+#### Preventing phantoms with materialized conflicts
+
+The problem of phantoms is that there are no rows to lock. However, as an alternative, we can have a second table that
+represents the state of what we are working with. For example, in the meeting room system, we can have a table that
+contains the list of rooms and the time slots that are available. When a user tries to book a room, we can use the
+SELECT FOR UPDATE pattern to lock the row that represents the room and the time slot. If another transaction tries
+to do the same, it will create a lock conflict, and it will fail.
+
+This should be used with caution because it can be error-prone and also leaks database implementation details into the
+application layer.
