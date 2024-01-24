@@ -374,3 +374,33 @@ to do the same, it will create a lock conflict, and it will fail.
 
 This should be used with caution because it can be error-prone and also leaks database implementation details into the
 application layer.
+
+## Serializability
+
+Serializable is usually seen as the strongest isolation level. It guarantees that two transactions that run concurrently
+will have the same effect as if they ran serially, one after the other.
+
+There are three ways to implement it:
+1. Literally running transactions in a serial order.
+2. Two-phase locking (2PL)
+3. Serializable snapshot isolation (SSI)
+
+### Actual Serial Execution
+
+It's the simplest way to avoid concurrency: literally eliminate it. Execute one single transaction at a time in the
+same thread.
+
+It has the obvious drawback of having the throughput limited by a single thread, so transactions need to be structured
+differently:
+
+1- Using stored procedures
+If we have a single thread executing transactions, they need to be short, so we can't have, for example, a transaction
+running and waiting for another input from the user. Instead, we can use a stored procedure to execute instructions at
+once.
+
+It has some drawbacks, such as: each database has its own language for it and code tends to be more difficult to debug, 
+test and maintain, although some databases have been changing it to use more common languages, such as Java, Lua and
+Clojure.
+
+It also has some advantages. If we can keep transactions short, we can optimize the I/O operations and avoid concurrency
+control mechanisms, achieving a good-enough throughput.
