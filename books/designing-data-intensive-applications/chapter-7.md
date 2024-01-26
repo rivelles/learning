@@ -404,3 +404,77 @@ Clojure.
 
 It also has some advantages. If we can keep transactions short, we can optimize the I/O operations and avoid concurrency
 control mechanisms, achieving a good-enough throughput.
+
+2- Partitioning
+
+In order to scale the throughput, we can split the data into several partitions and execute transactions in parallel.
+
+This has the trade-off of the additional overhead to coordinate the transactions. It also has the drawback that some
+transactions might need to access data from several partitions.
+
+### Two-Phase Locking (2PL)
+
+It's a concurrency control much stronger than a single lock. It aims to achieve serializability by allowing transactions
+to concurrently read an object as long as no other transaction is writing to it.
+
+- If transaction A is reading an object and transaction B wants to write to it, transaction B needs to wait until
+transaction A commits or aborts.
+- If transaction A is writing to an object and transaction B wants to read it, transaction B needs to wait until
+transaction A commits or aborts.
+
+Reading an old version of an object like in snapshot isolation is not allowed. 2PL doesn't only blocks writes, it also
+blocks reads.
+
+In Snapshot Isolation, _readers never block writers and writers never block readers_. This is the key difference between
+it and 2PL.
+
+The implementation of it uses a lock on each object, which can be in _shared mode_ or _exclusive mode_.
+
+- If a transaction wants to read an object, it must acquire a shared-mode lock on it. There can be several shared-mode
+locks on the same object at the same time. If another transaction holds an exclusive-mode lock on the object, the
+transaction will need to wait until it commits or aborts.
+- If a transaction wants to write to an object, it must acquire an exclusive-mode lock on it. There can be only one
+exclusive-mode lock on an object at a time and also no other shared-mode locks.
+- If a transaction holds a lock on an object, it can upgrade it to a stronger lock mode, which works the same way as
+acquiring a new lock.
+
+There could be situations where transaction A is waiting for transaction B to release a lock, and transaction B is
+waiting for transaction A to release a lock. This is called a **deadlock**. If the database detects it, it will abort
+one of the transactions and return an error to the application.
+
+With the overhead on controlling all these locks and the lack of concurrency, the biggest drawback of 2PL is the 
+performance.
+
+#### Predicate locks
+
+In the last sections, we discussed the Phantom problem (when a transaction updates the result of a SELECT query in 
+another). A serializable database must prevent these cases.
+
+In the meeting rooms example, if in one transaction we search for available rooms, it means that other transaction
+will not be able to concurrently update objects in the same range. For example, the following query will lock all
+objects matching the predicate:
+
+```sql
+SELECT * FROM bookings
+WHERE room_id = 1234 AND
+start_time < '2024-01-01 10:00' AND
+end_time > '2024-01-01 11:00';
+```
+The key idea is that the predicate lock will be able to acquire locks for objects that might not exist yet.
+
+#### Index-range locks
+
+Predicate locks don't usually perform well, since it becomes really time-consuming to match locks with conditions. For
+that reason, most databases use **index-range locks** instead.
+
+It's safe to imply in our past example that if we have a lock for all entries with room_id = 1234 or a lock for all
+rooms with start_time < '2024-01-01 10:00' and end_time > '2024-01-01 11:00', we will also have a lock for all entries
+that match the predicate. And most likely we will have an index set for some of these columns. Now, the database can
+attach a shared lock directly to the index when a transaction tries to execute it.
+
+This might lock a bigger portion of the index. For example, in the example, we would either block all time slots for
+booking 1234 or all rooms for the time slot, depending on which index we have. But it's a lower overhead than predicate
+locks.
+
+If there are no indexes that can be used, the database might fallback to lock the entire table, which is not good for
+performance.
