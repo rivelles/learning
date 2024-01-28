@@ -478,3 +478,82 @@ locks.
 
 If there are no indexes that can be used, the database might fallback to lock the entire table, which is not good for
 performance.
+
+### Serializable Snapshot Isolation (SSI)
+
+We saw some serializable techniques but they either have performance penalty, such as 2PL, or they are not serializable
+in some cases, such as snapshot isolation.
+
+In an attempt of having a serializable mechanism with a higher performance, SSI was created with an idea of using an 
+optimistic concurrency control approach. In 2PL, we have a pessimistic mechanism, meaning that the database blocks
+transactions to execute until they explicitly have a lock. In SSI, the transaction is executed without a lock and, if
+some conflict is detected, it will be aborted.
+
+SSI is based on snapshot isolation, so when a transaction reads something, it will read from a snapshot of the database.
+
+The implementation is based in the idea that when a transaction reads some data, it creates a premise, meaning that this
+data will be used in order to apply some logic. If this data changed, this premise might not be true anymore, so the
+transaction might be using stale data. There are two ways to detect this:
+- Detecting uncommitted writes that happened before an object was read. (Stale MVCC reads)
+- Detecting writes that affected previous reads.
+
+#### Detecting stale MVCC reads
+
+MVCC stands for multi-version concurrency control, which is used in snapshot isolation to allow updates to happen
+concurrently with reads. In SSI, if when committing a transaction, we detect that a premise is not true anymore, this
+transaction will be aborted.
+
+```mermaid
+sequenceDiagram
+    Transaction 1->>Database: begin transaction
+    Transaction 1->>Database: SELECT count(*) FROM doctors WHERE on_call = true AND shift_id = 100
+    Database->>Transaction 1: 2
+    Transaction 1->>Database: UPDATE doctors SET on_call = false WHERE id = 10 AND shift_id = 100
+    Database->>Transaction 1: ok
+    Transaction 2->>Database: begin transaction
+    Transaction 2->>Database: SELECT count(*) FROM doctors WHERE on_call = true AND shift_id = 100
+    Database->>Transaction 2: 2
+    Transaction 1->>Database: commit
+    Database->>Transaction 1: ok
+    Transaction 2->>Database: UPDATE doctors SET on_call = false WHERE id = 10 AND shift_id = 100
+    Database->>Transaction 2: ok
+    Transaction 2->>Database: commit
+    Database->>Transaction 2: ABORT
+```
+
+In this example, when transaction 2 tried to commit, the database detected that the premise it had was no longer true.
+
+#### Detecting writes that affect previous reads
+
+This happens when an update affect a read that has been done by a transaction.
+
+```mermaid
+sequenceDiagram
+    Transaction 1->>Database: begin transaction
+    Transaction 1->>Database: SELECT count(*) FROM doctors WHERE on_call = true AND shift_id = 100
+    Database->>Transaction 1: 2
+    Transaction 2->>Database: begin transaction
+    Transaction 2->>Database: SELECT count(*) FROM doctors WHERE on_call = true AND shift_id = 100
+    Database->>Transaction 2: 2
+    Transaction 1->>Database: UPDATE doctors SET on_call = false WHERE id = 10 AND shift_id = 100
+    Database->>Transaction 1: ok
+    Transaction 1->>Database: commit
+    Database->>Transaction 1: ok
+    Transaction 2->>Database: UPDATE doctors SET on_call = false WHERE id = 10 AND shift_id = 100
+    Database->>Transaction 2: ok
+    Transaction 2->>Database: commit
+    Database->>Transaction 2: ABORT
+```
+
+The difference here is that the update happened after the read, but it still affected the result in the same way.
+
+#### SSI Performance
+
+Unlike 2PL, serializable snapshot isolation doesn't need to acquire locks to execute transactions, so it will be more
+performant by nature. Like snapshot isolation, writers don't block readers and vice-versa. It's a really good 
+alternative for heavy read workloads since it will always read from a consistent snapshot.
+
+It's also not limited to a single thread, so it can achieve a higher throughput.
+
+SSI requires that read-write transactions are very short. Otherwise, the number of aborted transactions will be high,
+which might harm the performance. However, it's still less sensitive than in 2PL or serial execution.
