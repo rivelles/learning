@@ -80,3 +80,22 @@ TCP will also wait for the packages to be acknowledged, and if it doesn't receiv
 them all over again. Lost packages are also retransmitted.
 
 In public clouds, resources are shared among different users, and the network might be congested by a "noisy neighbor".
+
+## Synchronous and Asynchronous Networks
+
+We can use telephone calls to give an example of synchronous communication. When we call someone, a circuit is 
+established and the network guarantees that the voice call will have an allocated bandwidth at the entire time. This
+kind of network is synchronous. Data doesn't suffer any queuing, because it already has a guaranteed bandwidth.
+
+In the other hand, TCP connections are asynchronous. It will try to use whatever bandwidth is available. If you give
+it some data to send, it will try to do it in the shortest amount of time with the available bandwidth. If the 
+connection is idle, it won't use any bandwidth.
+
+Datacenter networks use packet switching network because they are projected for bursty traffic, different from phone
+or video calls which are continuous. We always want to complete a request as quickly as possible. Using circuits for
+bursty traffic would be inefficient because if the bandwidth is too low, it would take a lot of time to complete the
+request, and if the bandwidth is too high, it could waste resources, or it might not be able to set up. So, TCP will 
+dynamically allocate the necessary amount of bandwidth to complete the requests.
+
+However, there are some attempts to build hybrid models of network. With the correct approach, we can emulate a 
+synchronous model on packet networks.
