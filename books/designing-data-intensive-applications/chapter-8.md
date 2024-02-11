@@ -99,3 +99,29 @@ dynamically allocate the necessary amount of bandwidth to complete the requests.
 
 However, there are some attempts to build hybrid models of network. With the correct approach, we can emulate a 
 synchronous model on packet networks.
+
+## Unreliable Clocks
+
+In a distributed system, each node has its own clock, which are not perfectly synchronized. This can make it hard to
+understand certain things, such as order of events that happened across the machines.
+
+Computers have at least two types of clocks:
+- **Time-of day clock**: It returns the current date and time according to a calendar. These clocks are synchronized
+with the NTP protocol, which is a protocol that allows computers to synchronize their clocks over a network. So,
+ideally, these clocks should be in sync.
+- **Monotonic clock**: These are clocks that always move forward in time, so they are ideal to measure time intervals.
+The absolute value of these clocks are meaningless. It might be the number of nanoseconds since the computer was
+started, for example. The NTP protocol allows these clocks to be speeded up or slowed down in case they are moving
+too fast or too slow.
+
+### Clock Synchronization
+
+Only time-of-day clocks need to be synchronized. It's usually done using an NTP server. However, it's not simple to
+synchronize clocks over a network.
+- The quartz crystal that is inside the computer is not perfect, it might drift over time depending on conditions such
+as temperature.
+- If the clock differs too much from the NTP server, it might refuse to synchronize or be forcibly reset. Applications
+might see time going backwards or forward suddenly.
+- Network problems might affect the synchronization process.
+- Leap seconds are added to the calendar to keep it in sync with the Earth's rotation. This can make the clock go
+backwards or forwards by one second.
