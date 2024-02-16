@@ -125,3 +125,57 @@ might see time going backwards or forward suddenly.
 - Network problems might affect the synchronization process.
 - Leap seconds are added to the calendar to keep it in sync with the Earth's rotation. This can make the clock go
 backwards or forwards by one second.
+
+We previously saw the concept of LWW (Last Write Wins) in a distributed system. This is a common way to resolve conflicts
+in multi-leader databases. However, we can fall into problems if clocks are not fully synchronized between nodes.
+
+```mermaid
+sequenceDiagram
+    User A->>+Node 1: set x = 1
+    Node 1->>User A: OK (time = 12:00:00.004)
+    User B->>+Node 3: set x = x + 1
+    Node 3->>User B: OK (time = 12:00:00.003)
+    Node 3->>Node 2: x = x + 1 (time = 12:00:00.003)
+    Node 1->>Node 2: x = 1 (time = 12:00:00.004)
+```
+
+Here, although the increment of x happened after we set x to 1, the time of it is lower than the time of the first 
+operation, and this update would be lost.
+
+This can cause data to be suddenly lost without any error message.
+
+Since monotonic clocks are hard to be synchronized, whenever possible, it's a better alternative to rely on logical
+clocks, which are not based on the absolute time, but on the order of events.
+
+#### Clocks confidence interval
+
+When using a time-of-day Clock, it's impossible to be sure on the exact time it is reporting us. If we have just a 
+physical clock, the manufacturer will tell us the accuracy it has. However, in our case, we have clocks that can
+vary based on the quartz drift, the NTP server and the network. Our uncertainty will be the sum of all these factors.
+
+Picture this code which checks a lease set to a database node indicating it's the leader of its partition:
+
+```java
+while (true) {
+    var request = getIncomingRequest();
+    
+    if (lease.expireMillis - System.currentTimeMillis() < 10000) {
+        lease.renew();
+    }
+    
+    if (lease.isValid()) {
+        processRequest(request);
+    }
+}
+```
+
+This code has an issue: It compares the current time with the lease expiration time, which was set by another node. If
+clocks are out-of-sync, this comparison might not work as expected.
+
+Another issue that might happen is, if there is a pause in processing for more than 10 seconds between the check and
+the process request, the lease would still be valid for the process, however another node might have already taken the
+leadership. This can happen in some scenarios:
+- A stop-the-world garbage collection happens;
+- The virtual machine gets suspended, saving processes' execution to disk and continuing;
+- The operating system pauses the running thread to give time to another thread, or because of swapping;
+- UNIX process paused by a SIGSTOP signal;
