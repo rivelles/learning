@@ -179,3 +179,35 @@ leadership. This can happen in some scenarios:
 - The virtual machine gets suspended, saving processes' execution to disk and continuing;
 - The operating system pauses the running thread to give time to another thread, or because of swapping;
 - UNIX process paused by a SIGSTOP signal;
+
+## Knowledge, Truth and Lies
+
+Working with distributed systems, we need to be aware that we can't always trust the information we receive. For 
+example, one node might think it is the leader of a partition and start sending signals to other nodes, but if
+other nodes can't listen to it, it will be removed from the leadership by other nodes.
+
+Usually, some designs use a quorum to make decisions. For example, if we have 5 nodes, we might need 3 nodes to
+agree on something, such as acknowledging a write operation.
+
+The following image represents an incorrect implementation of a lock service.
+
+```mermaid
+sequenceDiagram
+    Node 1->>+Lock Service: get lease
+    Lock Service->>Node 1: ok (lock holder = Node 1)
+    Node 1->>Node 1: stop-the-world GC triggered
+    Lock Service->>Lock Service: lock lease expired
+    Node 2->>+Lock Service: get lease
+    Lock Service->>Node 2: ok (lock holder = Node 2)
+    Node 2->>DB: write data
+    DB->>Node 2: ok
+    Node 1->>DB: write data
+    DB->>Node 1: ok
+```
+
+Here, since the lease for node 1 expired and node 1 was running a GC, it expired and node 1 was unnaware of it. So it
+ended up corrupting data that was written by node 2.
+
+To avoid that, a fencing token can be used. It's a unique token that is associated with each lock, for example, an
+incrementing integer. When writing the information to the DB, it can check if the current token is still valid (i.e. 
+was not incremented by another node).
