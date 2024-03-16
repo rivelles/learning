@@ -188,3 +188,86 @@ as well, since the caches are not synchronized.
 Could this be different? Yes, but it would be much slower, so the decision here is not between network partition and
 linearizability, but between performance and linearizability. The chosen was to make it faster, and it is like that
 for many other systems.
+
+### Ordering Guarantees
+
+Ordering concept is important in distributed systems because it helps to preserve causality.
+- On an application that has a question being answered by another, there must be a causal dependency between them.
+- When there is an update operation, there was an insert one before it.
+- If we have two operations A and B, either A happened before B, B happened before A, or they are concurrent. If they 
+are concurrent, there is no causal dependency between them.
+
+Causality imposes ordering of events. One thing leads to another.
+
+A linearizable system behaves as if the data is stored in a single place and every operation is atomic. This implies
+that we have a **total order** of operations, because we are able to tell which happened before the other.
+
+Two events are ordered it there is causality between them. If they are concurrent, they are incomparable. So, if a system
+is not linearizable, it provides a **partial order** of operations.
+
+Therefore, in a linearizable database, there must be a single timeline which all operations are totally ordered, without
+any concurrency.
+
+It's safe to say that linearizability implies causality. Any system that is linearizable will preserve causality
+of its operations.
+
+We saw that many systems abandoned linearizability because of performance penalties. A middle ground is possible because
+linearizability is not the only way to support causality. New databases are being researched to provide solutions that 
+preserve causality with performance and availability characteristics that are similar to eventual consistent ones. This
+is a promising direction but we don't have many systems in production yet.
+
+#### Capturing the Causal Order
+
+In order to maintain causality, we need to know which operation happened before which other operation.
+
+Concurrent operations might happen, but they must be processed in the same order in all replicas. In order to do this, 
+we need to find a way of describing the "knowledge" of each node in the system about values they are storing.
+
+#### Sequence Number Ordering
+
+Keep track of all causalities can become impractical due to the amount of data systems process nowadays.
+
+One way systems do to track causality is to assign a sequence number to its operations. It can be generated as a
+timestamp (not using the system's clock due to its unreliability), but a logical clock. This is consistent with 
+causality: if A happened before B, then A's sequence number is less than B's.
+
+This is useful in databases with single-leader replication, where the leader can define the sequence number for each 
+operation and, when followers read the replication log, they can know which operations happened before others.
+
+If we are using multi-leader replication, there are several ways to assign sequential numbers:
+- Each node can generate sequence numbers with reserved allocated ranges, so they don't overlap.
+- Each node can attach a timestamp to the operation
+- If we have only two nodes, one can assign even numbers and the other odd numbers.
+
+However, neither of these approaches are consistent with causality. We can't tell which operation happened before the
+other.
+
+#### Lamport Timestamps
+
+The only method that is consistent with causality in this type of replication is called **Lamport timestamps**.
+
+Each node has a unique identifier and a counter of number of operations it has processed. This counter will always be
+the maximum number of operations in the node.
+
+```mermaid
+sequenceDiagram
+    Client A->>+Node 1: write x (max = 0)
+    Node 1->>Client A: ok (1, 1)
+    Client B->>+Node 2: write x (max = 0)
+    Node 2->>Client B: ok (1, 2)
+    Client B->>Node 2: write x (max = 1)
+    Node 2->>Client B: ok (2, 2)
+    Client B->>Node 2: write x (max = 2)
+    Node 2->>Client B: ok (3, 2)
+    Client A->>Node 2: write x (max = 1)
+    Node 2->>Client A: ok (4, 2)
+    Client A->>Node 1: write x (max = 4)
+    Node 1->>Client A: ok (5, 1)
+```
+
+Notice that, for every request and response, there is a max representing the counter of operations. When client write
+to the node, it sends the max it has seen so far. If the node has a max bigger than this number, it will return its max
+plus one. Notice how this happens in the past example when client A sends its max as 1 and receives 4 as response.
+
+The causality here is maintained by using the max number of operations, and if they are the same, the node's unique
+identifier is used to break the tie.
