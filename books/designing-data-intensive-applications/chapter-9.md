@@ -265,9 +265,56 @@ sequenceDiagram
     Node 1->>Client A: ok (5, 1)
 ```
 
-Notice that, for every request and response, there is a max representing the counter of operations. When client write
+Notice that, for every request and response, there is a max representing the counter of operations. When clients write
 to the node, it sends the max it has seen so far. If the node has a max bigger than this number, it will return its max
 plus one. Notice how this happens in the past example when client A sends its max as 1 and receives 4 as response.
 
 The causality here is maintained by using the max number of operations, and if they are the same, the node's unique
 identifier is used to break the tie.
+
+Lamport timestamps are similar to version vectors, the difference is that version vectors can distinguish between
+concurrent operations and causally related ones; while Lamport timestamps can only enforce total ordering, you can't
+tell if two operations are concurrent or not.
+
+#### Timestamp ordering is not enough
+
+Although Lamport timestamps are useful to maintain causality, they are not enough to solve some common problems in 
+distributed databases.
+
+Imagine we have a unique constraint that a user need to have a unique username. If two users try to create an account
+concurrently, the system would need to detect this and reject one of them.
+
+At first, it seems easy to solve this problem. We just need to pick the operation with the lowest timestamp and reject
+the other one. However, this works only for determining the winner **after** the fact has already happened. If the 
+system needs to decide right now if the request should succeed or fail, this approach doesn't work, since at that
+moment, the node doesn't know that other node is processing the same information.
+
+In order to achieve this constraint, we would need to check with all other nodes which timestamps they have seen so far,
+and if other node can't answer our system would grind to a halt, which is not desirable in a distributed environment.
+For example, in this example, if we insert a username, the node needs to check with all other nodes if they have created
+the same username, and if they have, it needs to reject the operation.
+
+### Total Order Broadcast
+
+In single-leader replication, the total order is guaranteed by using a single CPU core in the leader to process all
+sequences of operations. The main challenges are:
+- What happens when the leader fails?
+- How to scale the system for larger throughput?
+
+Total order broadcast is a protocol for exchanging messages between nodes with two properties:
+- No messages are lost: messages need to be delivered to all nodes.
+- All nodes deliver the messages in the same order.
+
+These constraints need to be satisfied even if the nodes are failing or there is a network partition.
+
+This is implemented in consensus services such as ZooKeeper and etcd.
+
+Another way of looking at this is using a log, such as a replication log, a write-ahead log or a transaction log.
+Delivering a message is like appending an entry to the log. Since all nodes need to deliver the same messages in the 
+same order, all of them can read the log and see the same messages in the same order.
+
+This is also useful for implementing a lock service that uses **fencing tokens**.
+
+#### Linearizability and Total Order Broadcast
+
+If you have total order broadcast, you can implement a linearizable storage on top of it.
