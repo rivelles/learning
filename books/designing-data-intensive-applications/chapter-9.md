@@ -343,4 +343,4 @@ We can think the other way around as well. If we have a linearizable storage, we
 top of it.
 
 Assuming we have a linearizable register that stores an integer, we can use a compare-and-set operation to increment the
-value attach it to all messages we send to the nodes.
+value attach it to all messages we send to the nodes. With this, nodes can control the order of messages they process.
