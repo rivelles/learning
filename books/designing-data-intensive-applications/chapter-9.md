@@ -317,4 +317,30 @@ This is also useful for implementing a lock service that uses **fencing tokens**
 
 #### Linearizability and Total Order Broadcast
 
-If you have total order broadcast, you can implement a linearizable storage on top of it.
+If you have total order broadcast, you can implement a linearizable storage on top of it. However, they are not the same
+concept.
+- Total order broadcast is asynchronous, it doesn't guarantee that the message will be delivered immediately. So we can
+have nodes lagging behind others.
+- Linearizability talks about read operations, making sure we won't see stale values.
+
+However, by having a total order broadcast, a linearizable storage can be built around it.
+
+Example: Having a unique constraint on a username.
+By using a compare-and-set operation, we can make sure the username will be set only if it doesn't yet exist. If we have
+a register for the username, it will be set only if its previous value is null. The logic could be:
+1. Append a message in the log with the operation to attempt to set the username.
+2. Read the log entries until we find the message we just appended.
+3. If the first message for the desired username is the one we appended, append another message with the confirmation 
+and acknowledge it to the client.
+
+If there are several concurrent writes, all nodes can agree what is the winner, since they will all read the logs in the
+same order.
+
+This approach guarantees linearizable writes, but it doesn't avoid stale reads, because we can read from nodes that are
+behind the leader.
+
+We can think the other way around as well. If we have a linearizable storage, we can implement total order broadcast on
+top of it.
+
+Assuming we have a linearizable register that stores an integer, we can use a compare-and-set operation to increment the
+value attach it to all messages we send to the nodes.
