@@ -343,4 +343,86 @@ We can think the other way around as well. If we have a linearizable storage, we
 top of it.
 
 Assuming we have a linearizable register that stores an integer, we can use a compare-and-set operation to increment the
-value attach it to all messages we send to the nodes. With this, nodes can control the order of messages they process.
+value and attach it to all messages we send to the nodes. With this, nodes can control the order of messages they 
+process.
+
+### Distributed Transactions and Consensus
+
+After discussing transactions, replication, linearizability and total order broadcast, we can now talk about consensus,
+which is a very important and discussed topic. This basically tells that nodes need to agree on something, which can
+be:
+- Leader election: In a database with single-leader replication, all nodes need to agree on who is the leader. Consensus
+becomes important in case of failover. A bad election could result in a split-brain scenario.
+- Atomic commit: In a distributed transaction, all nodes need to agree on the outcome of a transaction that can
+possibly fail.
+
+#### Atomic Commit and Two-Phase Commit (2PC)
+
+On a single node, when a transaction runs, first it modifies the data, then it changes the commit record. If a database
+crashes during this process, when it comes back, it can either rollback the changes or commit them, depending on the
+commit record values.
+
+However, it becomes more complicated in a distributed environment. If some nodes commit a transaction and some don't, we
+can't rollback the already committed ones, making them inconsistent across nodes. For this reason, a node can only 
+commit if all other nodes are also going to commit.
+
+Remember: If a node committed, this data becomes visible to clients, so we can't rollback it. This is the basic idea
+behind **read committed isolation level**.
+
+> We can use compensating transactions to rollback a transaction that has already been committed. This is a common
+pattern but refers more to business logic than to database transactions.
+
+In the two-phased commit algorithm, the commit-abort process is divided into two phases.
+
+```mermaid
+sequenceDiagram
+    Coordinator->>DB 1: write data
+    DB 1->>Coordinator: ok
+    Coordinator->>DB 2: write data
+    DB 2->>Coordinator: ok
+    Coordinator->>DB 1: prepare
+    Coordinator->>DB 2: prepare
+    DB 1->>Coordinator: ok
+    DB 2->>Coordinator: ok
+    Coordinator->>DB 1: commit
+    Coordinator->>DB 2: commit
+    DB 1->>Coordinator: ok
+    DB 2->>Coordinator: ok
+```
+
+2PC uses a new component, called a coordinator, or a transaction manager. It's often implemented as a library in the
+application code.
+
+The algorithm starts with the application reading and writing data normally to the database nodes. When the application
+wants to commit, it sends a prepare message to all nodes.
+- If all participants say yes, indicating they are ready to commit, the coordinator sends a commit message to all of
+them.
+- If any participant says no, indicating they are not ready to commit, the coordinator sends an abort message to all of
+them.
+
+In more details, it will:
+1. When the application begins a distributed transaction, it requests a transaction ID to the coordinator.
+2. The application begins writing to the nodes attaching the transaction ID, if anythingoes wrong, it can rollback.
+3. When the application is ready to commit, the coordinator sends a prepare message to all nodes. If any of these calls
+fail for any reason, the coordinator sends an abort message to all nodes.
+4. When a node receives a prepare request, it makes sure that the data is consistent and will be able to commit. By
+replying yes, it says that it's ready to commit and surrenders the right to abort.
+5. When the coordinator receives the responses for all nodes, it takes a decision of committing or aborting, depending
+on the responses. It writes the decision to disk so it knows what to do in case of a crash.
+6. The commit or abort is sent to all participants. If this request fails, the coordinator will retry until it succeeds.
+Even if the node crashed, it will be forced to commit when it recovers since it voted "yes" in the prepare phase.
+
+This protocol has two points of no-return: when the node votes "yes" it basically says it will be able to commit no
+matter what, and when the coordinator decides to commit, that decision is irrevocable.
+
+Similarly to a marriage ceremony, once the participants already said "I do", there is no turning back. Even if one of
+them faints, when they wake up, they will be married.
+
+#### Coordinator failure
+
+If the coordinator crashes before sending the commit after a node has voted "yes", this transaction will be stuck in
+the "prepared" state waiting for the commit to come from the coordinator. A timeout wouldn't help here because it might
+make the node inconsistent with another one that committed.
+
+The only way to recover is to wait for the coordinator to be running again. When it comes back, it will read the log
+and send the commit or abort messages to the nodes.
