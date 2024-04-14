@@ -426,3 +426,52 @@ make the node inconsistent with another one that committed.
 
 The only way to recover is to wait for the coordinator to be running again. When it comes back, it will read the log
 and send the commit or abort messages to the nodes.
+
+### Distributed Transactions in Practice
+
+Many cloud services chose not to implement distributed transactions using 2Pc due to operational problems, such as
+what happens when a coordinator crashes and low performance. It carries a heavy performance penalty (distributed 
+transactions in MySQL are 10x slower than local transactions, for example). This is because of the additional disk
+forcing (fsync - "flush the data") required for crash recovery and additional network roundtrips.
+
+Distributed transactions can be homogeneous or heterogeneous.
+- In n homogeneous model, all nodes involved are using the same software with the same version, therefore, they can
+understand the same protocol.
+- In a heterogeneous model, nodes are using different software, and they all need to agree on the same protocol, 
+otherwise it's impossible to have a distributed transaction.
+
+For example, imagine we want to acknowledge a message in a queue only after we have written the data to the database.
+It's possible to implement it if both the database and the queue are using the same protocol.
+
+If one side effect of processing the message is to send an e-mail and th e-mail server doesn't support 2PC, it could
+happen that the e-mail is sent more than once.
+
+#### XA Transactions
+
+XA is a standard for implementing 2PC in a distributed heterogeneous environment. It's supported by many databases and
+message brokers, such as PostgreSQL, MySQL, DB2, SQL Server, Oracle, ActiveMQ, IBM MQ.
+
+The transaction coordinator is usually implemented as a library in the application code, which implements the XA API.
+It will keep track of the participants in a transaction, collect their responses from the prepare phase and use a log
+on disk to keep track on the commit/abort decisions.
+
+If the application crashes, any participants with prepared transactions will get stuck. The application server must
+be restarted and the coordinator library needs to read the log to process the transactions that are stuck. Then it will
+send the commit or abort messages to the participants.
+
+##### Locks
+
+The main problem on this kind of transactions is that, when a node is stuck in the prepared state, it might have locks
+in several rows in the database. If it's using a read committed isolation level, rows that will be written will be
+locked; if it's using repeatable read/snapshot isolation, it will lock rows that will be read too. Therefore, if the
+coordinator crashes before committing/aborting, these locks will be held indefinitely.
+
+If the coordinator can't decide what to do - maybe because the log file was lost or corrupted, these transactions need
+to be resolved manually by an administrator. They need to evaluate if the transaction can be committed or aborted and
+then send the message to the coordinator to do so.
+
+
+#### Limitations of XA Transactions
+
+- The coordinator becomes a single point of failure.
+- If we have stateless server-side applications, making them handle transactions transforms them into stateful.
