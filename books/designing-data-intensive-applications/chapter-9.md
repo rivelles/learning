@@ -475,3 +475,40 @@ then send the message to the coordinator to do so.
 
 - The coordinator becomes a single point of failure.
 - If we have stateless server-side applications, making them handle transactions transforms them into stateful.
+
+### Fault-Tolerant Consensus
+
+Consensus means making different nodes agree on something. The problem is usually normalized as: different nodes are 
+proposing values, and the algorithm needs to decide on one of those values.
+
+When we saw 2PC, the coordinator was the component making all the decisions, however, if it goes down, the system might
+become stuck, therefore, this is not a **fault-tolerant** consensus algorithm. The most known fault-tolerant consensus
+algorithms are **Paxos** and **Raft**, **VSR** and **Zab**.
+
+Although they are different, they share some similarities. They decide on a sequence of values, making them **total 
+order broadcast** algorithms.
+
+Is single-leader replication a consensus algorithm?
+In this setup, we can have  two types of leader election:
+1. The leader is elected manually, making all writes go through it. If this node goes down, the whole system is 
+unavailable to accept writes, making it not fault-tolerant.
+2. The leader is elected automatically, with this, the system can decide on a new leader if the current one goes down.
+
+However, we can still have problems. We saw previously that we can fall into a split-brain scenario, where two nodes
+believe they are both leaders. To solve this, we need another consensus, but the algorithm we saw requires a leader, so
+we fall into a conundrum scenario.
+
+#### Epoch numbering
+
+The algorithms we saw are designer to work with a leader, however, they don't need to guarantee that the leader is unique.
+Instead, they can use an epoch number and guarantee that, within an epoch, there is one unique leader.
+
+If the leader goes down, the nodes will elect a new one and increase the epoch number. If there is a conflict because
+the previous leader is still alive, the leader with the highest epoch number will win. A node can't only trust its own
+judgment, it needs to know if other nodes also consider it as the leader. It does that by collecting votes from a quorum
+of nodes. If a leader wants to make a decision, it needs to collect votes from this quorum. A node will vote in favour
+only if it believes the leader has the highest epoch number.
+
+This is very similar to 2PC, but the main differences are:
+- The coordinator is elected by the nodes.
+- Not **all** nodes need to agree on the decision, only a quorum.
