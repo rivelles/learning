@@ -62,3 +62,27 @@ nodes to access files on that machine. A central server called NameNode keeps tr
 stored. In the end, it will be one big filesystem distributed across many machines.
 
 In order to tolerate failures, it replicates data into different machines.
+
+### MapReduce Job Execution
+
+A MapReduce job usually follows these steps:
+1. Read a set of input files and break them into records (for example, a log output can be broken into lines).
+2. Call the mapper function to perform some operation on each record (for example, extract the timestamp of the log 
+line).
+3. Sort the records by key.
+4. Call the reducer function to perform an operation on the group of records (for example, count).
+
+Steps 1 and 3 are implicit in the MapReduce framework, so we need to implement only the **mapper** and **reducer** 
+functions.
+
+The **mapper** function is called once for each record in the input file. It can produce zero or more key-value pairs.
+After the MapReduce collects the key-value pairs, it sorts them by key and groups them by key. The **reducer** function
+is called once for each key, with the list of values for that key and will produce zero or more output records, for 
+example, the number of occurrences of a URL.
+
+The role of the mapper is to transform the input data, while the role of the reducer is to process that data that have
+been transformed and sorted.
+
+As we saw, the difference between Unix processing and MapReduce is that the second can run on multiple machines. The
+mapper and reduce functions don't need to know where the data is coming from, they just need to process one record at
+a time. In Hadoop MapReduce, for example, the mapper and reduce are just Java classes that implement an interface.
