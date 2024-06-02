@@ -92,3 +92,37 @@ example was running, a possible issue is that this sequence of execution happens
 
 The expected value here would be 2, because we had 2 increments. However, the value is 1 because the increment of Thread
 2 was lost.
+
+To prevent this scenario, we need to make the operations **atomic**.
+
+### The `volatile` keyword
+
+This keyword may help to prevent race conditions. When a variable is declared as `volatile`, it will be stored in the
+heap memory directly. When we read a `volatile` variable, we will always get the most recent value from the heap memory,
+preventing reading stale data.
+
+However, it doesn't make the operations atomic. Even with this, one thread can still read a value from the heap, update
+it and write it back to the heap, and another thread can do the same, causing, again, a lost update.
+
+This is because this keyword doesn't lock the variable, it just makes sure that the value is always read from the heap.
+
+### The `synchronized` keyword
+
+This keyword is used to make a block of code or a method atomic. We can declare a block of code as `synchronized`, then,
+if a thread wants to execute it, it will need to acquire a lock on the object that references the block of code. After
+executing, it will release the lock so other thread can also execute it.
+
+We can synchronize a block of code or an object:
+
+```java
+public synchronized void increment() {
+    counter++;
+}
+
+public void increment() {
+    synchronized (someObject) {
+        someObject.increment();
+    }
+}
+```
+
