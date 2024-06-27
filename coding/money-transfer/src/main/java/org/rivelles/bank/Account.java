@@ -1,15 +1,14 @@
 package org.rivelles.bank;
 
-import org.rivelles.bank.exceptions.InvalidAmountException;
-import org.rivelles.bank.exceptions.NullAmountException;
-
 import java.math.BigDecimal;
-import java.util.Objects;
 import java.util.concurrent.locks.StampedLock;
 
-import static org.rivelles.bank.AmountValidator.assertAmount;
-
 public class Account {
+    private final StampedLock lock = new StampedLock();
+
+    public String getNumber() {
+        return number;
+    }
 
     private final String number;
 
@@ -20,28 +19,36 @@ public class Account {
         this.balance = BigDecimal.ZERO;
     }
 
-
-    public void credit(BigDecimal value) {
-        assertAmount(value);
-
-        synchronized (this) {
-            balance = balance.add(value);
-        }
+    public void credit(BigDecimal amount) {
+        executeWithWriteLock(() -> balance = balance.add(amount));
     }
 
-    public void debit(BigDecimal value) {
-        assertAmount(value);
-
-        synchronized (this) {
-            balance = balance.subtract(value);
-        }
+    public void debit(BigDecimal amount) {
+        executeWithWriteLock(() -> balance = balance.subtract(amount));
     }
 
-    public synchronized BigDecimal getBalance() {
+    public BigDecimal getBalance() {
+        BigDecimal balance;
+        var stamp = lock.tryOptimisticRead();
+        balance = this.balance;
+        if (!lock.validate(stamp)) {
+            stamp = lock.readLock();
+            try {
+                return this.balance;
+            }
+            finally {
+                lock.unlock(stamp);
+            }
+        }
         return balance;
     }
 
-    public String getNumber() {
-        return number;
+    private void executeWithWriteLock(Runnable runnable) {
+        var stamp = lock.writeLock();
+        try {
+            runnable.run();
+        } finally {
+            lock.unlock(stamp);
+        }
     }
 }
