@@ -47,6 +47,12 @@ public class MutableInteger {
 }
 ```
 
+Intrinsic locking guarantees that, once a thread finishes executing a synchronized block, all changes that were made are
+visible to other threads when they acquire the same lock.
+
+To ensure that all threads can see the most up-to-date values, the reading and writing threads must synchronize on the 
+same lock.
+
 ### An issue with long and double types
 
 When a thread reads stale value, it means that it might not be the most up-to-date value, but at least it's a value that
@@ -55,3 +61,25 @@ was written once by some thread. One exception to this are the long and double t
 They are 64-bit numbers and, internally, the JVM kit threats reads and writes to them as two different operations
 to 32-bit numbers. So, it's possible that a stale value gets the new value for the first 32 bits and the old value for 
 the last 32- bits.
+
+### Volatile variables
+
+A weaker form of synchronization. When a variable is declared synchronized, Java guarantees that all changes made to it
+will be propagated to other threads safely. These variables won't be cached in the registers nor other caches, so
+whenever a thread reads them, they are always getting the most up-to-date value.
+
+Accessing a volatile variable doesn't require acquiring locks so threads won't be blocked if they need to write to it,
+making it a light-weighted version of synchronization.
+
+The most common use cases for that are status flags to indicate signals such as completion or interruption of some
+processing, for example in this example, where we have one anthropomorphized thread counting sheeps only while it's not 
+sleeping:
+
+```java
+volatile boolean asleep;
+...
+while (!asleep) 
+    countSomeSheep();
+```
+
+**Locking can guarantee both visibility and atomicity; volatile variables can only guarantee visibility.**
