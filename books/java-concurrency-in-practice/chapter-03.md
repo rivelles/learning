@@ -83,3 +83,149 @@ while (!asleep)
 ```
 
 **Locking can guarantee both visibility and atomicity; volatile variables can only guarantee visibility.**
+
+## Publication and Escape
+
+Publishing means making an object available to outside its current scope, which includes:
+- Storing a reference to where other code can find it;
+- Returning it in a non-private method;
+- Passing it to a method as an argument in another class.
+
+Publishing objects may compromise encapsulation and makes it harder to guarantee its invariants. An object that is
+published when it shouldn't is being said to have _escaped_.
+
+The following example is the simplest form of escaping: declaring an object as public static:
+```java
+public static Set<Secret> knownSecrets;
+
+public void initialize() {
+    knownSecrets = new HashSet<Secret>();
+}
+```
+
+Any piece of code can read and modify the set of secrets.
+
+This other example shows how escaping can happen by returning a reference to an object from a method:
+```java
+class UnsafeStates {
+    private String[] states = new String[] {
+            "AK", "AL" ...
+    };
+    public String[] getStates() { return states; } 
+}
+```
+
+Now, any caller can modify the `states` content, this is not a desirable intent.
+
+Another example that can be problematic is by escaping the reference of this. This happens when escaping inner class 
+instances:
+```java
+public class ThisEscape {
+    public ThisEscape(EventSource source) {
+        source.registerListener (new EventListener() {
+            public void onEvent(Event e) { 
+                doSomething(e);
+            }
+        });
+    }
+}
+```
+
+A common mistake that leads to this case is when a thread is started from the constructor of a class. The new thread 
+might be able to see the object before it's fully constructed.
+
+To avoid this scenario, we can use a private constructor and expose a public factory method:
+
+```java
+public class SafeListener {
+    private final EventListener listener;
+    private SafeListener() {
+        listener = new EventListener() {
+            public void onEvent(Event e) { 
+                doSomething(e);
+            }
+        };
+}
+    public static SafeListener newInstance(EventSource source) { 
+        SafeListener safe = new SafeListener(); 
+        source.registerListener(safe.listener);
+        return safe;
+    }
+}
+```
+
+Another example of letting this escape is shown in the following code:
+
+```java
+public class Foo {
+    public Foo() {
+        doSomething();
+    }
+
+    public void doSomething() {
+        System.out.println("do something acceptable");
+    }
+}
+
+public class Bar extends Foo {
+    public void doSomething() {
+        System.out.println("yolo");
+        Zoom zoom = new Zoom(this); // at this point 'this' might not be fully initialized
+    }
+}
+```
+
+## Thread Confinement
+
+We already saw that, to ensure thread safety, we need mutable data to be shared using synchronization. Another way to
+achieve that is by simply **not share**. This technique is called thread confinement. When an object is confined to a 
+thread, it is automatically thread-safe.
+
+A common use case of thread confinement is pooled JDBC `Connection` objects. When a thread acquires a connection, it
+uses it for processing a request and returns it. This pattern implicitly confines the `Connection` to that thread for
+the duration of the processing.
+
+Following is an example of stack confinement, where we have a SortedSet instantiated and referenced by the `animals` 
+variable. This reference is only accessed within the `loadTheArk` method, therefore it is confined to the current thread.
+If we were to return the SortedSet, the confinement would be violated and the _animals would escape_.
+
+```java
+public int loadTheArk(Collection<Animal> candidates) { SortedSet<Animal> animals;
+    int numPairs = 0;
+    Animal candidate = null;
+    animals = new TreeSet<Animal>(new SpeciesGenderComparator()); 
+    animals.addAll(candidates);
+    
+    for (Animal a : animals) {
+        if (candidate == null || !candidate.isPotentialMate(a)) 
+            candidate = a;
+        else {
+            ark.load(new AnimalPair(candidate, a)); ++numPairs;
+            candidate = null;
+        } 
+    }
+    return numPairs;
+}
+```
+
+### ThreadLocal
+
+A more formal way to ensure thread confinement. When using ThreadLocal, get and set methods will be provided and they
+will maintain a separate copy of the object for each thread that calls it. So, `get()` will return the most recent value
+defined by the `set()` **from the current thread**.
+
+```java
+private static ThreadLocal<Connection> connectionHolder = new ThreadLocal<Connection>() {
+    public Connection initialValue() {
+        return DriverManager.getConnection(DB_URL);
+    }
+};
+
+public static Connection getConnection() { 
+    return connectionHolder.get();
+}
+```
+
+This example holds a global shared Connection, but each thread that gets it will get a copy of the initial value.
+
+Conceptually, `ThreadLocal<T>` can be seen as a `Map<Thread, T>`. (This is not how it's actually implemented)
